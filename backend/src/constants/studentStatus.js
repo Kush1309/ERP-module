@@ -1,0 +1,13 @@
+const STUDENT_STATUS = Object.freeze({
+  ACTIVE: 'ACTIVE',
+  INACTIVE: 'INACTIVE',
+  GRADUATED: 'GRADUATED',
+  TRANSFERRED: 'TRANSFERRED',
+});
+
+const STUDENT_STATUS_VALUES = Object.freeze(Object.values(STUDENT_STATUS));
+
+module.exports = {
+  STUDENT_STATUS,
+  STUDENT_STATUS_VALUES,
+};
