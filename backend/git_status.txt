@@ -1,0 +1,12 @@
+ M backend/src/routes/index.js
+ M frontend/src/App.jsx
+?? backend/src/controllers/studentController.js
+?? backend/src/routes/studentRoutes.js
+?? backend/src/services/studentService.js
+?? diff.txt
+?? diff_utf8.txt
+?? frontend/src/components/Modal.jsx
+?? frontend/src/components/students/
+?? frontend/src/pages/admin/
+?? frontend/src/services/studentApi.js
+?? start_app.bat

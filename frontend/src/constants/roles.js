@@ -8,6 +8,6 @@ export const ROLES = {
 export const ROLE_HOME = {
   ADMIN: '/admin',
   TEACHER: '/teacher',
-  STUDENT: '/student',
+  STUDENT: '/student/dashboard',
   PARENT: '/parent',
 };

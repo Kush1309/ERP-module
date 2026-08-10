@@ -245,11 +245,25 @@ const updateStudentStatus = async (id, isActive) => {
     return { student, user: { loginId: user.loginId, isActive: user.isActive } };
 };
 
+const getCurrentStudent = async (userId) => {
+    // Only return safe profile fields
+    const student = await Student.findOne({ user: userId })
+        .populate('user', 'loginId role isActive mustChangePassword')
+        .lean();
+
+    if (!student) {
+        throw new AppError('Student profile not found', 404);
+    }
+
+    return student;
+};
+
 module.exports = {
     createStudentAccount,
     generateTempPassword,
     getStudentsList,
     getStudentById,
     updateStudentById,
-    updateStudentStatus
+    updateStudentStatus,
+    getCurrentStudent
 };

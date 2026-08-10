@@ -1,0 +1,76 @@
+﻿diff --git a/backend/src/routes/index.js b/backend/src/routes/index.js
+index 5c6803f..622153f 100644
+--- a/backend/src/routes/index.js
++++ b/backend/src/routes/index.js
+@@ -2,11 +2,13 @@ const express = require('express');
+ const healthRoutes = require('./healthRoutes');
+ const authRoutes = require('./authRoutes');
+ const protectedRoutes = require('./protectedRoutes');
++const studentRoutes = require('./studentRoutes');
+ 
+ const router = express.Router();
+ 
+ router.use('/health', healthRoutes);
+ router.use('/auth', authRoutes);
+ router.use('/protected', protectedRoutes);
++router.use('/students', studentRoutes);
+ 
+ module.exports = router;
+diff --git a/frontend/src/App.jsx b/frontend/src/App.jsx
+index 5758ed8..d20a305 100644
+--- a/frontend/src/App.jsx
++++ b/frontend/src/App.jsx
+@@ -10,6 +10,10 @@ import AdminDashboardPage from './pages/AdminDashboardPage';
+ import TeacherDashboardPage from './pages/TeacherDashboardPage';
+ import StudentDashboardPage from './pages/StudentDashboardPage';
+ import ParentDashboardPage from './pages/ParentDashboardPage';
++import StudentManagementPage from './pages/admin/StudentManagementPage';
++import AddStudentPage from './pages/admin/AddStudentPage';
++import StudentDetailsPage from './pages/admin/StudentDetailsPage';
++import EditStudentPage from './pages/admin/EditStudentPage';
+ import { ROLES } from './constants/roles';
+ 
+ function App() {
+@@ -38,6 +42,42 @@ function App() {
+           }
+         />
+ 
++        <Route
++          path="/admin/students"
++          element={
++            <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
++              <StudentManagementPage />
++            </ProtectedRoute>
++          }
++        />
++
++        <Route
++          path="/admin/students/new"
++          element={
++            <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
++              <AddStudentPage />
++            </ProtectedRoute>
++          }
++        />
++
++        <Route
++          path="/admin/students/:id"
++          element={
++            <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
++              <StudentDetailsPage />
++            </ProtectedRoute>
++          }
++        />
++
++        <Route
++          path="/admin/students/:id/edit"
++          element={
++            <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
++              <EditStudentPage />
++            </ProtectedRoute>
++          }
++        />
++
+         <Route
+           path="/teacher"
+           element={

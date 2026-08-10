@@ -38,3 +38,8 @@ export const deactivateStudent = async (id) => {
     const response = await apiClient.patch(`/students/${id}/deactivate`);
     return response.data;
 };
+
+export const getCurrentStudent = async () => {
+    const response = await apiClient.get('/students/me');
+    return response.data?.data;
+};

@@ -80,11 +80,22 @@ const deactivateStudentAccount = asyncHandler(async (req, res) => {
     });
 });
 
+const getCurrentStudent = asyncHandler(async (req, res) => {
+    const userId = req.user.id;
+    const student = await studentService.getCurrentStudent(userId);
+
+    res.status(200).json({
+        success: true,
+        data: student
+    });
+});
+
 module.exports = {
     createStudent,
     getStudents,
     getStudentById,
     updateStudent,
     activateStudentAccount,
-    deactivateStudentAccount
+    deactivateStudentAccount,
+    getCurrentStudent
 };
