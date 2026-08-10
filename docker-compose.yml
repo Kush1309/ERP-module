@@ -1,0 +1,51 @@
+version: "3.8"
+
+services:
+  mongodb:
+    image: mongo:latest
+    container_name: school-erp-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - school-erp-net
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: school-erp-backend
+    ports:
+      - "5000:5000"
+    environment:
+      - MONGODB_URI=mongodb://mongodb:27017/school-erp
+      - PORT=5000
+      - CLIENT_URL=http://localhost:5173
+      - NODE_ENV=development
+      - JWT_SECRET=change_this_to_a_long_random_secret_at_least_32_chars
+      - JWT_EXPIRES_IN=1d
+      - ADMIN_PASSWORD=AdminPass123
+    depends_on:
+      - mongodb
+    networks:
+      - school-erp-net
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: school-erp-frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    networks:
+      - school-erp-net
+
+volumes:
+  mongo-data:
+
+networks:
+  school-erp-net:
+    driver: bridge

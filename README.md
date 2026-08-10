@@ -139,6 +139,34 @@ Example response:
 }
 ```
 
+## Dockerization
+
+You can run the entire application stack (Frontend, Backend, and MongoDB) using Docker Compose.
+
+### Prerequisites
+
+Ensure you have [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/) installed.
+
+### Steps to Run
+
+1. Open your terminal at the root of the project (`school-erp`).
+2. Build and start the containers in detached mode:
+
+```bash
+docker-compose up --build -d
+```
+
+3. Your services will now be accessible at:
+   - **Frontend**: http://localhost:5173
+   - **Backend**: http://localhost:5000
+   - **MongoDB**: exposed on localhost:27017
+
+4. To stop the containers, use:
+
+```bash
+docker-compose down
+```
+
 ## Current scope
 
 This foundation includes:
