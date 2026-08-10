@@ -7,6 +7,8 @@ const { hashPassword } = require('../utils/password');
 const { ROLES } = require('../constants/roles');
 const { generateTempPassword } = require('./studentService');
 
+const escapeRegex = (string) => string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 const createTeacherAccount = async (teacherData) => {
     // Check duplicates
     if (teacherData.email) {
@@ -118,6 +120,88 @@ const createTeacherAccount = async (teacherData) => {
     };
 };
 
+const getTeachersList = async (queryOpts) => {
+    let { page = 1, limit = 10, search, class: className, section, status } = queryOpts;
+
+    page = Math.max(parseInt(page, 10) || 1, 1);
+    limit = Math.min(Math.max(parseInt(limit, 10) || 10, 1), 100);
+
+    const query = {};
+
+    if (className) query.assignedClass = className;
+    if (section) query.assignedSection = section;
+
+    let userIdsFromUserQuery = null;
+
+    if (status) {
+        const isActive = status.toUpperCase() === 'ACTIVE';
+        const users = await User.find({ role: ROLES.TEACHER, isActive }, '_id').lean();
+        userIdsFromUserQuery = users.map(u => String(u._id));
+    }
+
+    if (search) {
+        const safeSearch = escapeRegex(search);
+        const searchRegex = { $regex: safeSearch, $options: 'i' };
+
+        const matchingUsers = await User.find({ role: ROLES.TEACHER, loginId: searchRegex }, '_id').lean();
+        const matchingUserIds = matchingUsers.map(u => String(u._id));
+
+        query.$or = [
+            { firstName: searchRegex },
+            { lastName: searchRegex },
+            { email: searchRegex },
+            { phone: searchRegex },
+            { user: { $in: matchingUserIds } }
+        ];
+    }
+
+    if (userIdsFromUserQuery) {
+        query.user = query.user || {};
+        const existingIn = query.user.$in;
+        if (existingIn) {
+            query.user.$in = existingIn.filter(id => userIdsFromUserQuery.includes(String(id)));
+        } else {
+            query.user.$in = userIdsFromUserQuery;
+        }
+    }
+
+    const [teachers, total] = await Promise.all([
+        Teacher.find(query)
+            .populate('user', 'loginId role isActive mustChangePassword')
+            .skip((page - 1) * limit)
+            .limit(limit)
+            .lean(),
+        Teacher.countDocuments(query)
+    ]);
+
+    return {
+        teachers,
+        pagination: {
+            page,
+            limit,
+            total,
+            totalPages: Math.ceil(total / limit)
+        }
+    };
+};
+
+const getTeacherById = async (id) => {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+        throw new AppError('Invalid Teacher ID format', 400);
+    }
+    const teacher = await Teacher.findById(id)
+        .populate('user', 'loginId role isActive mustChangePassword')
+        .lean();
+
+    if (!teacher) {
+        throw new AppError('Teacher not found', 404);
+    }
+
+    return teacher;
+};
+
 module.exports = {
-    createTeacherAccount
+    createTeacherAccount,
+    getTeachersList,
+    getTeacherById
 };

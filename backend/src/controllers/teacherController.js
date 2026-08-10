@@ -1,6 +1,6 @@
 const asyncHandler = require('../utils/asyncHandler');
 const AppError = require('../utils/AppError');
-const { createTeacherAccount } = require('../services/teacherService');
+const teacherService = require('../services/teacherService');
 
 // POST /api/teachers
 const createTeacher = asyncHandler(async (req, res) => {
@@ -27,7 +27,7 @@ const createTeacher = asyncHandler(async (req, res) => {
         assignedSection
     };
 
-    const { user, teacher, temporaryPassword } = await createTeacherAccount(teacherData);
+    const { user, teacher, temporaryPassword } = await teacherService.createTeacherAccount(teacherData);
 
     // Format safe response matching project conventions
     res.status(201).json({
@@ -55,6 +55,30 @@ const createTeacher = asyncHandler(async (req, res) => {
     });
 });
 
+// GET /api/teachers
+const getTeachers = asyncHandler(async (req, res) => {
+    const result = await teacherService.getTeachersList(req.query);
+
+    res.status(200).json({
+        success: true,
+        message: 'Teachers retrieved successfully',
+        data: result
+    });
+});
+
+// GET /api/teachers/:id
+const getTeacherById = asyncHandler(async (req, res) => {
+    const teacher = await teacherService.getTeacherById(req.params.id);
+
+    res.status(200).json({
+        success: true,
+        message: 'Teacher retrieved successfully',
+        data: { teacher }
+    });
+});
+
 module.exports = {
-    createTeacher
+    createTeacher,
+    getTeachers,
+    getTeacherById
 };
