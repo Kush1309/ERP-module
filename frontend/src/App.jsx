@@ -14,6 +14,8 @@ import StudentManagementPage from './pages/admin/StudentManagementPage';
 import AddStudentPage from './pages/admin/AddStudentPage';
 import StudentDetailsPage from './pages/admin/StudentDetailsPage';
 import EditStudentPage from './pages/admin/EditStudentPage';
+import AttendanceManagementPage from './pages/admin/AttendanceManagementPage';
+import TeacherAttendancePage from './pages/teacher/TeacherAttendancePage';
 import { ROLES } from './constants/roles';
 
 function App() {
@@ -79,10 +81,28 @@ function App() {
         />
 
         <Route
+          path="/admin/attendance"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+              <AttendanceManagementPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
           path="/teacher"
           element={
             <ProtectedRoute allowedRoles={[ROLES.TEACHER]}>
               <TeacherDashboardPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/teacher/attendance"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.TEACHER]}>
+              <TeacherAttendancePage />
             </ProtectedRoute>
           }
         />
