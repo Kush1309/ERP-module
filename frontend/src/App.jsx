@@ -10,6 +10,10 @@ import AdminDashboardPage from './pages/AdminDashboardPage';
 import TeacherDashboardPage from './pages/TeacherDashboardPage';
 import StudentDashboardPage from './pages/StudentDashboardPage';
 import ParentDashboardPage from './pages/ParentDashboardPage';
+import StudentManagementPage from './pages/admin/StudentManagementPage';
+import AddStudentPage from './pages/admin/AddStudentPage';
+import StudentDetailsPage from './pages/admin/StudentDetailsPage';
+import EditStudentPage from './pages/admin/EditStudentPage';
 import { ROLES } from './constants/roles';
 
 function App() {
@@ -34,6 +38,42 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
               <AdminDashboardPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/admin/students"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+              <StudentManagementPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/admin/students/new"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+              <AddStudentPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/admin/students/:id"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+              <StudentDetailsPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/admin/students/:id/edit"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+              <EditStudentPage />
             </ProtectedRoute>
           }
         />
