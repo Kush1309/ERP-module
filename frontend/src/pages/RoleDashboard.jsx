@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import Button from '../components/Button';
 import { useAuth } from '../hooks/useAuth';
 
-function RoleDashboard({ title, description }) {
+function RoleDashboard({ title, description, children }) {
   const { user, logout } = useAuth();
 
   const handleLogout = async () => {
@@ -59,6 +59,12 @@ function RoleDashboard({ title, description }) {
             Log out
           </Button>
         </div>
+
+        {children && (
+          <div className="mt-8 border-t border-ink-100 pt-8">
+            {children}
+          </div>
+        )}
       </div>
     </div>
   );

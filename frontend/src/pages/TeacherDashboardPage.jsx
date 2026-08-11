@@ -1,11 +1,21 @@
+import { Link } from 'react-router-dom';
 import RoleDashboard from './RoleDashboard';
+import Button from '../components/Button';
 
 function TeacherDashboardPage() {
   return (
     <RoleDashboard
       title="Teacher dashboard"
-      description="Placeholder for future teaching modules. Authentication and role checks are active."
-    />
+      description="Authentication and role checks are active."
+    >
+      <div>
+        <h2 className="mb-2 font-display text-xl font-semibold text-ink-900">Teacher Operations</h2>
+        <p className="mb-4 text-sm text-ink-600">Manage your classroom attendance.</p>
+        <Link to="/teacher/attendance">
+          <Button type="button">Mark Attendance</Button>
+        </Link>
+      </div>
+    </RoleDashboard>
   );
 }
 
