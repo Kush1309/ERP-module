@@ -322,6 +322,175 @@ const getTeacherAttendanceHistory = async (userId, queryOpts = {}) => {
     };
 };
 
+const getTeacherAttendanceReport = async (userId, queryOpts = {}) => {
+    const { startDate, endDate, search, status, page = 1, limit = 10 } = queryOpts;
+
+    // 1. Resolve Teacher Identity
+    const teacher = await Teacher.findOne({ user: userId }).lean();
+    if (!teacher) {
+        throw new AppError('Teacher profile not found', 403);
+    }
+
+    // 2. Validate Dates Safely
+    let startD, endD;
+    if (startDate) {
+        startD = new Date(startDate);
+        if (isNaN(startD)) throw new AppError('Invalid start date', 400);
+        startD.setUTCHours(0, 0, 0, 0);
+    }
+    if (endDate) {
+        endD = new Date(endDate);
+        if (isNaN(endD)) throw new AppError('Invalid end date', 400);
+        endD.setUTCHours(23, 59, 59, 999); // Inclusion till end of day
+    }
+    if (startD && endD && startD > endD) {
+        throw new AppError('Start date cannot be after end date', 400);
+    }
+
+    // 3. Validate Status
+    if (status && status !== 'PRESENT' && status !== 'ABSENT') {
+        throw new AppError('Invalid status filter', 400);
+    }
+
+    // 4. Resolve Authorized Students Boundaries
+    const studentQuery = { class: teacher.assignedClass, section: teacher.assignedSection };
+
+    // Apply Search Inside Authorized Boundary
+    if (search) {
+        const searchRegex = new RegExp(search.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&'), 'i');
+        studentQuery.$or = [
+            { firstName: searchRegex },
+            { lastName: searchRegex },
+            { rollNumber: searchRegex },
+            { studentId: searchRegex }
+        ];
+    }
+
+    // Total Count of Eligible Students
+    const totalStudents = await Student.countDocuments(studentQuery);
+
+    const safePage = Math.max(parseInt(page) || 1, 1);
+    let safeLimit = parseInt(limit) || 10;
+    if (safeLimit < 1) safeLimit = 10;
+    if (safeLimit > 100) safeLimit = 100;
+    const skip = (safePage - 1) * safeLimit;
+
+    // Paginated Core Roster
+    const paginatedStudents = await Student.find(studentQuery)
+        .select('firstName lastName studentId rollNumber')
+        .skip(skip)
+        .limit(safeLimit)
+        .sort({ rollNumber: 1 })
+        .lean();
+
+    // To compute Global Summary correctly, get ALL matching authorized student IDs
+    const allAuthorizedStudents = await Student.find(studentQuery, '_id').lean();
+    const allStudentIds = allAuthorizedStudents.map(s => s._id);
+
+    // 5. Shared Attendance Filters
+    const attFilter = {};
+    if (startD || endD) {
+        attFilter.date = {};
+        if (startD) attFilter.date.$gte = startD;
+        if (endD) attFilter.date.$lte = endD;
+    }
+
+    // Global Aggregate
+    const globalAttFilter = { ...attFilter, student: { $in: allStudentIds } };
+    if (status) {
+        globalAttFilter.status = status;
+    }
+
+    const summaryAgg = await Attendance.aggregate([
+        { $match: globalAttFilter },
+        {
+            $group: {
+                _id: "$student",
+                presentCount: { $sum: { $cond: [{ $eq: ["$status", "PRESENT"] }, 1, 0] } },
+                absentCount: { $sum: { $cond: [{ $eq: ["$status", "ABSENT"] }, 1, 0] } }
+            }
+        },
+        {
+            $group: {
+                _id: null,
+                studentsWithAttendance: { $sum: 1 },
+                totalPresent: { $sum: "$presentCount" },
+                totalAbsent: { $sum: "$absentCount" }
+            }
+        }
+    ]);
+
+    const summaryRaw = summaryAgg.length > 0 ? summaryAgg[0] : { studentsWithAttendance: 0, totalPresent: 0, totalAbsent: 0 };
+
+    const sumRecords = summaryRaw.totalPresent + summaryRaw.totalAbsent;
+    const overallPercentage = sumRecords > 0 ? Number(((summaryRaw.totalPresent / sumRecords) * 100).toFixed(2)) : 0;
+
+    const summary = {
+        totalStudents: allStudentIds.length,
+        studentsWithAttendance: summaryRaw.studentsWithAttendance,
+        totalPresent: summaryRaw.totalPresent,
+        totalAbsent: summaryRaw.totalAbsent,
+        overallPercentage
+    };
+
+    // 6. Page Aggregate
+    const pageStudentIds = paginatedStudents.map(s => s._id);
+    const pageAttFilter = { ...attFilter, student: { $in: pageStudentIds } };
+    if (status) {
+        pageAttFilter.status = status;
+    }
+
+    const pageAgg = await Attendance.aggregate([
+        { $match: pageAttFilter },
+        {
+            $group: {
+                _id: "$student",
+                present: { $sum: { $cond: [{ $eq: ["$status", "PRESENT"] }, 1, 0] } },
+                absent: { $sum: { $cond: [{ $eq: ["$status", "ABSENT"] }, 1, 0] } }
+            }
+        }
+    ]);
+
+    const attMap = {};
+    pageAgg.forEach(p => {
+        attMap[p._id.toString()] = p;
+    });
+
+    // 7. Combine Matrix
+    const data = paginatedStudents.map(st => {
+        const ag = attMap[st._id.toString()] || { present: 0, absent: 0 };
+        const present = ag.present;
+        const absent = ag.absent;
+        const total = present + absent;
+        const percentage = total > 0 ? Number(((present / total) * 100).toFixed(2)) : 0;
+
+        return {
+            student: {
+                _id: st._id,
+                studentId: st.studentId,
+                firstName: st.firstName,
+                lastName: st.lastName,
+                rollNumber: st.rollNumber
+            },
+            total,
+            present,
+            absent,
+            percentage
+        };
+    });
+
+    return {
+        data,
+        summary,
+        pagination: {
+            total: totalStudents,
+            page: safePage,
+            limit: safeLimit,
+            pages: Math.ceil(totalStudents / safeLimit)
+        }
+    };
+};
+
 const updateTeacherAttendance = async (userId, attendanceId, status) => {
     if (!mongoose.Types.ObjectId.isValid(attendanceId)) {
         throw new AppError('Invalid attendance ID', 400);
@@ -367,5 +536,6 @@ module.exports = {
     getTeacherRoster,
     createBulkAttendance,
     getTeacherAttendanceHistory,
-    updateTeacherAttendance
+    updateTeacherAttendance,
+    getTeacherAttendanceReport
 };

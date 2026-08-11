@@ -71,3 +71,17 @@ export const updateTeacherAttendance = async (id, status) => {
     const response = await apiClient.patch(`/attendance/teacher/${id}`, { status });
     return response.data;
 };
+
+export const getTeacherAttendanceReport = async (params = {}) => {
+    const { page = 1, limit = 10, ...otherParams } = params;
+
+    const response = await apiClient.get('/attendance/teacher/report', {
+        params: {
+            page,
+            limit,
+            ...otherParams
+        },
+    });
+
+    return response.data;
+};

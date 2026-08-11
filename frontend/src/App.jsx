@@ -20,6 +20,7 @@ import AddTeacherPage from './pages/admin/AddTeacherPage';
 import TeacherDetailsPage from './pages/admin/TeacherDetailsPage';
 import TeacherAttendancePage from './pages/teacher/TeacherAttendancePage';
 import TeacherAttendanceHistoryPage from './pages/teacher/TeacherAttendanceHistoryPage';
+import TeacherAttendanceReportPage from './pages/teacher/TeacherAttendanceReportPage';
 import { ROLES } from './constants/roles';
 
 function App() {
@@ -143,6 +144,15 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={[ROLES.TEACHER]}>
               <TeacherAttendanceHistoryPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/teacher/attendance/report"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.TEACHER]}>
+              <TeacherAttendanceReportPage />
             </ProtectedRoute>
           }
         />
