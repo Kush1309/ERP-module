@@ -9,6 +9,20 @@ function AdminDashboardPage() {
     >
       <div className="space-y-6">
         <div>
+          <h2 className="text-lg font-semibold text-ink-900 mb-3">Student Management</h2>
+          <div className="grid sm:grid-cols-2 gap-4">
+            <Link to="/admin/students" className="block p-4 rounded-xl border border-ink-200 bg-white hover:border-brand-300 hover:shadow-sm transition-all text-left">
+              <h3 className="font-medium text-ink-900">Student Management</h3>
+              <p className="mt-1 text-sm text-ink-500">Manage students, view student details, and manage student records.</p>
+            </Link>
+            <Link to="/admin/students/new" className="block p-4 rounded-xl border border-ink-200 bg-white hover:border-brand-300 hover:shadow-sm transition-all text-left">
+              <h3 className="font-medium text-ink-900">Add Student</h3>
+              <p className="mt-1 text-sm text-ink-500">Create a new student profile in the system.</p>
+            </Link>
+          </div>
+        </div>
+
+        <div>
           <h2 className="text-lg font-semibold text-ink-900 mb-3">Teacher Management</h2>
           <div className="grid sm:grid-cols-2 gap-4">
             <Link to="/admin/teachers" className="block p-4 rounded-xl border border-ink-200 bg-white hover:border-brand-300 hover:shadow-sm transition-all text-left">
