@@ -120,7 +120,7 @@ function TeacherManagementPage() {
                     <p className="mt-2 text-sm text-ink-600">Manage teacher profiles and assignments.</p>
                 </div>
                 <Link to="/admin/teachers/new">
-                    <Button type="button" variant="secondary" className="min-w-[150px] whitespace-nowrap" disabled>
+                    <Button type="button" variant="secondary" className="min-w-[150px] whitespace-nowrap">
                         + Add Teacher
                     </Button>
                 </Link>
@@ -214,9 +214,11 @@ function TeacherManagementPage() {
                                 Clear Filters
                             </Button>
                         ) : (
-                            <Button type="button" variant="secondary" disabled>
-                                + Add Teacher
-                            </Button>
+                            <Link to="/admin/teachers/new">
+                                <Button type="button" variant="secondary">
+                                    + Add Teacher
+                                </Button>
+                            </Link>
                         )}
                     </div>
                 ) : (

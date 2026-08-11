@@ -14,6 +14,11 @@ export const getTeachers = async (params = {}) => {
     return response.data?.data;
 };
 
+export const createTeacher = async (teacherData) => {
+    const response = await apiClient.post('/teachers', teacherData);
+    return response.data; // Note: controller returns `{ success, message, data: { teacher, credentials } }` directly mapping to response.data
+};
+
 export const getTeacherById = async (id) => {
     const response = await apiClient.get(`/teachers/${id}`);
     return response.data?.data?.teacher;
