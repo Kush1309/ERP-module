@@ -84,11 +84,8 @@ function TeacherAttendancePage() {
             };
 
             await createBulkAttendance(payload);
+            await fetchRoster();
             setSuccess('Attendance marked successfully.');
-
-            // Keep data visible on successful form entry but reset form cleanly? User said:
-            // "After successful save: refresh attendance data". We can fetchRoster() to pull cleanly, 
-            // though typically they remain on page.
 
         } catch (err) {
             // Provide clean errors for 409 or 403
