@@ -66,3 +66,8 @@ export const getTeacherHistory = async (params = {}) => {
 
     return response.data;
 };
+
+export const updateTeacherAttendance = async (id, status) => {
+    const response = await apiClient.patch(`/attendance/teacher/${id}`, { status });
+    return response.data;
+};

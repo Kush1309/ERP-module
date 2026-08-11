@@ -322,6 +322,42 @@ const getTeacherAttendanceHistory = async (userId, queryOpts = {}) => {
     };
 };
 
+const updateTeacherAttendance = async (userId, attendanceId, status) => {
+    if (!mongoose.Types.ObjectId.isValid(attendanceId)) {
+        throw new AppError('Invalid attendance ID', 400);
+    }
+
+    if (status !== 'PRESENT' && status !== 'ABSENT') {
+        throw new AppError('Invalid status', 400);
+    }
+
+    const teacher = await Teacher.findOne({ user: userId }).lean();
+    if (!teacher) {
+        throw new AppError('Teacher profile not found', 404);
+    }
+
+    // Populate student to verify ownership
+    const attendance = await Attendance.findById(attendanceId).populate('student', 'class section');
+    if (!attendance) {
+        throw new AppError('Attendance record not found', 404);
+    }
+
+    const studentClass = attendance.student?.class;
+    const studentSection = attendance.student?.section;
+
+    if (studentClass !== teacher.assignedClass || studentSection !== teacher.assignedSection) {
+        throw new AppError('You are not authorized to modify this attendance.', 403);
+    }
+
+    if (attendance.status === status) {
+        return attendance; // No-op if status is unchanged
+    }
+
+    attendance.status = status;
+    await attendance.save();
+    return attendance;
+};
+
 module.exports = {
     createAttendance,
     getAttendances,
@@ -330,5 +366,6 @@ module.exports = {
     updateAttendance,
     getTeacherRoster,
     createBulkAttendance,
-    getTeacherAttendanceHistory
+    getTeacherAttendanceHistory,
+    updateTeacherAttendance
 };

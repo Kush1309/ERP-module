@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { getTeacherHistory } from '../../services/attendanceApi';
+import { getTeacherHistory, updateTeacherAttendance } from '../../services/attendanceApi';
 import Button from '../../components/Button';
 import Card from '../../components/Card';
+import Modal from '../../components/Modal';
 
 function TeacherAttendanceHistoryPage() {
     const [attendances, setAttendances] = useState([]);
@@ -14,6 +15,13 @@ function TeacherAttendanceHistoryPage() {
     const [statusFilter, setStatusFilter] = useState('');
     const [studentSearch, setStudentSearch] = useState('');
     const [pageNumber, setPageNumber] = useState(1);
+
+    // Modal state
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [selectedAttendance, setSelectedAttendance] = useState(null);
+    const [nextStatus, setNextStatus] = useState('');
+    const [isActionLoading, setIsActionLoading] = useState(false);
+    const [actionError, setActionError] = useState('');
 
     const debounceRef = useRef(null);
 
@@ -36,7 +44,6 @@ function TeacherAttendanceHistoryPage() {
         }
     }, []);
 
-    // Effect for non-debounced items (date, status, page)
     useEffect(() => {
         const filters = {
             page: pageNumber,
@@ -50,11 +57,10 @@ function TeacherAttendanceHistoryPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [dateFilter, statusFilter, pageNumber]);
 
-    // Effect for debounced student search changes
     const handleStudentSearchChange = (e) => {
         const val = e.target.value;
         setStudentSearch(val);
-        setPageNumber(1); // Reset to page 1 on search change
+        setPageNumber(1);
 
         if (debounceRef.current) clearTimeout(debounceRef.current);
 
@@ -89,6 +95,42 @@ function TeacherAttendanceHistoryPage() {
     const handlePrevPage = () => {
         if (pageNumber > 1) {
             setPageNumber(prev => prev - 1);
+        }
+    };
+
+    const handleActionClick = (record) => {
+        setActionError('');
+        setSelectedAttendance(record);
+        setNextStatus(record.status === 'PRESENT' ? 'ABSENT' : 'PRESENT');
+        setIsModalOpen(true);
+    };
+
+    const handleConfirmUpdate = async () => {
+        if (!selectedAttendance) return;
+
+        setIsActionLoading(true);
+        setActionError('');
+
+        try {
+            await updateTeacherAttendance(selectedAttendance._id, nextStatus);
+            setIsModalOpen(false);
+            setSelectedAttendance(null);
+            setNextStatus('');
+
+            // Re-fetch using current state
+            const filters = {
+                page: pageNumber,
+                limit: 10
+            };
+            if (dateFilter) filters.date = dateFilter;
+            if (statusFilter) filters.status = statusFilter;
+            if (studentSearch) filters.student = studentSearch;
+
+            loadHistory(filters);
+        } catch (err) {
+            setActionError(err.response?.data?.message || 'Unable to update attendance.');
+        } finally {
+            setIsActionLoading(false);
         }
     };
 
@@ -191,6 +233,7 @@ function TeacherAttendanceHistoryPage() {
                                 <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-ink-600">Name</th>
                                 <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-ink-600">Roll No.</th>
                                 <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-ink-600">Status</th>
+                                <th className="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wide text-ink-600">Action</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-ink-200 bg-white">
@@ -217,12 +260,22 @@ function TeacherAttendanceHistoryPage() {
                                                 {record.status === 'PRESENT' ? 'Present' : 'Absent'}
                                             </span>
                                         </td>
+                                        <td className="px-6 py-4 text-right">
+                                            <Button
+                                                type="button"
+                                                variant="secondary"
+                                                className="!py-1 !px-2.5 !text-xs"
+                                                onClick={() => handleActionClick(record)}
+                                            >
+                                                Change to {record.status === 'PRESENT' ? 'Absent' : 'Present'}
+                                            </Button>
+                                        </td>
                                     </tr>
                                 ))
                             ) : (
                                 !loading && (
                                     <tr>
-                                        <td colSpan="5" className="px-6 py-12 text-center">
+                                        <td colSpan="6" className="px-6 py-12 text-center">
                                             <p className="text-base font-medium text-ink-900">No attendance records found.</p>
                                             <p className="mt-1 text-sm text-ink-500">Try adjusting your filters.</p>
                                         </td>
@@ -262,6 +315,42 @@ function TeacherAttendanceHistoryPage() {
                     </div>
                 )}
             </Card>
+
+            <Modal
+                isOpen={isModalOpen}
+                onClose={() => !isActionLoading && setIsModalOpen(false)}
+                title="Confirm Attendance Correction"
+            >
+                <div className="space-y-4">
+                    <p className="text-sm text-ink-600">
+                        Are you sure you want to change this student's attendance from <span className="font-semibold">{selectedAttendance?.status === 'PRESENT' ? 'Present' : 'Absent'}</span> to <span className="font-semibold">{nextStatus === 'PRESENT' ? 'Present' : 'Absent'}</span>?
+                    </p>
+
+                    {actionError && (
+                        <div className="rounded-md bg-red-50 p-3 text-sm text-red-600">
+                            {actionError}
+                        </div>
+                    )}
+
+                    <div className="flex justify-end gap-3 pt-4">
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={() => setIsModalOpen(false)}
+                            disabled={isActionLoading}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            type="button"
+                            onClick={handleConfirmUpdate}
+                            disabled={isActionLoading}
+                        >
+                            {isActionLoading ? 'Saving...' : 'Confirm'}
+                        </Button>
+                    </div>
+                </div>
+            </Modal>
         </div>
     );
 }

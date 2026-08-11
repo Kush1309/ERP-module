@@ -7,7 +7,8 @@ const {
     updateAttendance,
     getTeacherRoster,
     createBulkAttendance,
-    getTeacherAttendanceHistory
+    getTeacherAttendanceHistory,
+    updateTeacherAttendance
 } = require('../controllers/attendanceController');
 const { authenticateUser, authorizeRoles } = require('../middlewares/auth');
 const { ROLES } = require('../constants/roles');
@@ -40,6 +41,13 @@ router.get(
     authenticateUser,
     authorizeRoles(ROLES.TEACHER),
     getTeacherAttendanceHistory
+);
+
+router.patch(
+    '/teacher/:id',
+    authenticateUser,
+    authorizeRoles(ROLES.TEACHER),
+    updateTeacherAttendance
 );
 
 router.post(
