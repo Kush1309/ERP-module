@@ -4,8 +4,9 @@ const asyncHandler = require('../utils/asyncHandler');
 const createAttendance = asyncHandler(async (req, res) => {
     // Only extract whitelisted fields
     const { student, date, status, remarks } = req.body;
+    const userId = req.user.id;
 
-    const attendance = await attendanceService.createAttendance({
+    const attendance = await attendanceService.createAttendance(userId, {
         student,
         date,
         status,
@@ -94,8 +95,9 @@ const updateAttendance = asyncHandler(async (req, res) => {
     const { id } = req.params;
     // Whitelist fields
     const { status, remarks, date } = req.body;
+    const userId = req.user.id;
 
-    const updated = await attendanceService.updateAttendance(id, { status, remarks, date });
+    const updated = await attendanceService.updateAttendance(userId, id, { status, remarks, date });
 
     res.status(200).json({
         success: true,
@@ -196,13 +198,15 @@ const getAdminAttendanceById = asyncHandler(async (req, res) => {
 const updateAdminAttendance = asyncHandler(async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
-    const updated = await attendanceService.updateAdminAttendance(id, status);
+    const userId = req.user.id;
+    const updated = await attendanceService.updateAdminAttendance(userId, id, status);
     res.status(200).json({ success: true, data: updated, message: 'Attendance record updated successfully' });
 });
 
 const deleteAdminAttendance = asyncHandler(async (req, res) => {
     const { id } = req.params;
-    await attendanceService.deleteAdminAttendance(id);
+    const userId = req.user.id;
+    await attendanceService.deleteAdminAttendance(userId, id);
     res.status(200).json({ success: true, message: 'Attendance record deleted successfully' });
 });
 
@@ -236,6 +240,20 @@ const exportAdminAttendance = asyncHandler(async (req, res) => {
     res.status(200).send(csvData);
 });
 
+const getAttendanceAuditLogs = asyncHandler(async (req, res) => {
+    const { page, limit, startDate, endDate, action, status, search } = req.query;
+
+    const result = await attendanceService.getAttendanceAuditLogs({
+        page, limit, startDate, endDate, action, status, search
+    });
+
+    res.status(200).json({
+        success: true,
+        data: result.logs,
+        pagination: result.pagination
+    });
+});
+
 module.exports = {
     createAttendance,
     getAttendances,
@@ -254,5 +272,6 @@ module.exports = {
     updateAdminAttendance,
     deleteAdminAttendance,
     getAdminAttendanceAnalytics,
-    exportAdminAttendance
+    exportAdminAttendance,
+    getAttendanceAuditLogs
 };

@@ -200,8 +200,13 @@ export default function AttendanceManagementPage() {
                         </Button>
                     </Link>
                     <Link to="/admin/attendance/analytics">
-                        <Button type="button" className="w-full sm:w-auto">
+                        <Button type="button" variant="secondary" className="w-full sm:w-auto text-brand-600 bg-brand-50 border border-brand-200 hover:bg-brand-100">
                             Analytics Dashboard
+                        </Button>
+                    </Link>
+                    <Link to="/admin/attendance/audit">
+                        <Button type="button" className="w-full sm:w-auto bg-amber-600 hover:bg-amber-700 text-white border-transparent shadow hover:shadow-md">
+                            Attendance Audit
                         </Button>
                     </Link>
                     <Button

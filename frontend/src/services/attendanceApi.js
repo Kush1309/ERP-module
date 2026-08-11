@@ -146,6 +146,11 @@ export const getAdminAttendanceAnalytics = async (params = {}) => {
     return response.data;
 };
 
+export const getAttendanceAuditLogs = async (params = {}) => {
+    const response = await apiClient.get('/attendance/admin/audit', { params });
+    return response.data;
+};
+
 export const exportAdminAttendance = async (params = {}) => {
     const response = await apiClient.get('/attendance/admin/export', {
         params,

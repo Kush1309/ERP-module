@@ -1,10 +1,11 @@
 const { Attendance } = require('../models/Attendance');
 const Student = require('../models/Student');
 const Teacher = require('../models/Teacher');
+const AttendanceAudit = require('../models/AttendanceAudit');
 const AppError = require('../utils/AppError');
 const mongoose = require('mongoose');
 
-const createAttendance = async (attendanceData) => {
+const createAttendance = async (userId, attendanceData) => {
     const { student, date, status, remarks } = attendanceData;
 
     if (!student || !date || !status) {
@@ -33,6 +34,16 @@ const createAttendance = async (attendanceData) => {
             status,
             remarks
         });
+
+        await AttendanceAudit.create({
+            attendance: attendance._id,
+            action: 'CREATED',
+            performedBy: userId,
+            previousStatus: null,
+            newStatus: status,
+            student: student
+        });
+
         return attendance;
     } catch (error) {
         if (error.code === 11000) {
@@ -199,7 +210,7 @@ const getMyAttendanceHistory = async (userId, queryOpts = {}) => {
     };
 };
 
-const updateAttendance = async (id, updateData) => {
+const updateAttendance = async (userId, id, updateData) => {
     if (!mongoose.Types.ObjectId.isValid(id)) {
         throw new AppError('Invalid attendance ID', 400);
     }
@@ -207,6 +218,8 @@ const updateAttendance = async (id, updateData) => {
     if (!attendance) {
         throw new AppError('Attendance record not found', 404);
     }
+
+    const previousStatus = attendance.status;
 
     // Only allow specific updates
     const { status, remarks, date } = updateData;
@@ -222,6 +235,18 @@ const updateAttendance = async (id, updateData) => {
 
     try {
         await attendance.save();
+
+        if (status && previousStatus !== status) {
+            await AttendanceAudit.create({
+                attendance: attendance._id,
+                action: 'UPDATED',
+                performedBy: userId,
+                previousStatus,
+                newStatus: status,
+                student: attendance.student
+            });
+        }
+
         return attendance;
     } catch (error) {
         if (error.code === 11000) {
@@ -315,6 +340,17 @@ const createBulkAttendance = async (userId, bulkData) => {
 
     // Write all atomically
     const inserted = await Attendance.insertMany(documents, { ordered: true });
+
+    // Writing audit logs in bulk
+    const audits = inserted.map(doc => ({
+        attendance: doc._id,
+        action: 'CREATED',
+        performedBy: userId,
+        previousStatus: null,
+        newStatus: doc.status,
+        student: doc.student
+    }));
+    await AttendanceAudit.insertMany(audits, { ordered: false });
 
     return inserted;
 };
@@ -614,8 +650,19 @@ const updateTeacherAttendance = async (userId, attendanceId, status) => {
         return attendance; // No-op if status is unchanged
     }
 
+    const previousStatus = attendance.status;
     attendance.status = status;
     await attendance.save();
+
+    await AttendanceAudit.create({
+        attendance: attendance._id,
+        action: 'UPDATED',
+        performedBy: userId,
+        previousStatus,
+        newStatus: status,
+        student: attendance.student._id || attendance.student
+    });
+
     return attendance;
 };
 
@@ -890,7 +937,7 @@ const getAdminAttendanceById = async (id) => {
     return attendance;
 };
 
-const updateAdminAttendance = async (id, status) => {
+const updateAdminAttendance = async (userId, id, status) => {
     if (!mongoose.Types.ObjectId.isValid(id)) {
         throw new AppError('Invalid attendance ID', 400);
     }
@@ -901,12 +948,25 @@ const updateAdminAttendance = async (id, status) => {
     if (!attendance) {
         throw new AppError('Attendance record not found', 404);
     }
+    const previousStatus = attendance.status;
+    if (previousStatus === status) return attendance;
+
     attendance.status = status;
     await attendance.save();
+
+    await AttendanceAudit.create({
+        attendance: attendance._id,
+        action: 'UPDATED',
+        performedBy: userId,
+        previousStatus,
+        newStatus: status,
+        student: attendance.student
+    });
+
     return attendance;
 };
 
-const deleteAdminAttendance = async (id) => {
+const deleteAdminAttendance = async (userId, id) => {
     if (!mongoose.Types.ObjectId.isValid(id)) {
         throw new AppError('Invalid attendance ID', 400);
     }
@@ -914,7 +974,20 @@ const deleteAdminAttendance = async (id) => {
     if (!attendance) {
         throw new AppError('Attendance record not found', 404);
     }
+    const previousStatus = attendance.status;
+    const student = attendance.student;
+
     await Attendance.deleteOne({ _id: id });
+
+    await AttendanceAudit.create({
+        attendance: id,
+        action: 'DELETED',
+        performedBy: userId,
+        previousStatus,
+        newStatus: null,
+        student: student
+    });
+
     return { success: true };
 };
 
@@ -1180,6 +1253,120 @@ const exportAdminAttendance = async (queryOpts = {}) => {
     return csvRows.join('\n');
 };
 
+const getAttendanceAuditLogs = async (queryOpts = {}) => {
+    const { page, limit, startDate, endDate, action, status, search } = queryOpts;
+
+    const safePage = Math.max(parseInt(page) || 1, 1);
+    let safeLimit = parseInt(limit) || 10;
+    if (safeLimit < 1) safeLimit = 10;
+    if (safeLimit > 100) safeLimit = 100;
+    const skip = (safePage - 1) * safeLimit;
+
+    const filter = {};
+    if (action) {
+        filter.action = action;
+    }
+    if (status) {
+        filter.$or = [{ previousStatus: status }, { newStatus: status }];
+    }
+
+    if (startDate || endDate) {
+        filter.createdAt = {};
+        if (startDate) {
+            const startD = new Date(startDate);
+            if (!isNaN(startD)) {
+                startD.setUTCHours(0, 0, 0, 0);
+                filter.createdAt.$gte = startD;
+            }
+        }
+        if (endDate) {
+            const endD = new Date(endDate);
+            if (!isNaN(endD)) {
+                endD.setUTCHours(23, 59, 59, 999);
+                filter.createdAt.$lte = endD;
+            }
+        }
+    }
+
+    if (search) {
+        const safeSearch = String(search).replace(/[.*+?^${}()|[\]\\]/g, '\\$&').toLowerCase();
+        const searchRegex = new RegExp(safeSearch, 'i');
+
+        // Lookup matching students and users
+        const [matchingStudents, matchingUsers] = await Promise.all([
+            Student.find({
+                $or: [
+                    { firstName: searchRegex },
+                    { lastName: searchRegex },
+                    { rollNumber: searchRegex },
+                    { studentId: searchRegex }
+                ]
+            }, '_id').lean(),
+            mongoose.model('User').find({ loginId: searchRegex }, '_id').lean()
+        ]);
+
+        const matchingStudentIds = matchingStudents.map(s => s._id);
+        const matchingUserIds = matchingUsers.map(u => u._id);
+
+        if (matchingStudentIds.length > 0 || matchingUserIds.length > 0) {
+            const searchOrs = [];
+            if (matchingStudentIds.length > 0) searchOrs.push({ student: { $in: matchingStudentIds } });
+            if (matchingUserIds.length > 0) searchOrs.push({ performedBy: { $in: matchingUserIds } });
+
+            if (filter.$or) {
+                filter.$and = [{ $or: filter.$or }, { $or: searchOrs }];
+                delete filter.$or;
+            } else {
+                filter.$or = searchOrs;
+            }
+        } else {
+            // If search matches nothing, return empty
+            return {
+                logs: [],
+                pagination: { total: 0, page: safePage, limit: safeLimit, totalPages: 0 }
+            };
+        }
+    }
+
+    const [logs, total] = await Promise.all([
+        AttendanceAudit.find(filter)
+            .populate('student', 'firstName lastName studentId class section rollNumber')
+            .populate('performedBy', 'loginId role')
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(safeLimit)
+            .lean(),
+        AttendanceAudit.countDocuments(filter)
+    ]);
+
+    return {
+        logs: logs.map(l => ({
+            action: l.action,
+            previousStatus: l.previousStatus,
+            newStatus: l.newStatus,
+            createdAt: l.createdAt,
+            student: l.student ? {
+                studentId: l.student.studentId,
+                firstName: l.student.firstName,
+                lastName: l.student.lastName,
+                rollNumber: l.student.rollNumber,
+                class: l.student.class,
+                section: l.student.section
+            } : null,
+            performedBy: l.performedBy ? {
+                loginId: l.performedBy.loginId,
+                role: l.performedBy.role
+            } : null
+        })),
+        pagination: {
+            total,
+            page: safePage,
+            limit: safeLimit,
+            totalPages: Math.ceil(total / safeLimit)
+        }
+    };
+};
+
 module.exports = {
     createAttendance,
     getAttendances,
@@ -1198,5 +1385,6 @@ module.exports = {
     updateAdminAttendance,
     deleteAdminAttendance,
     getAdminAttendanceAnalytics,
-    exportAdminAttendance
+    exportAdminAttendance,
+    getAttendanceAuditLogs
 };
