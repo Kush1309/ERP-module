@@ -99,3 +99,17 @@ export const getMyAttendanceHistory = async (params = {}) => {
 
     return response.data;
 };
+
+export const getAdminAttendanceReport = async (params = {}) => {
+    const { page = 1, limit = 10, ...otherParams } = params;
+
+    const response = await apiClient.get('/attendance/admin/report', {
+        params: {
+            page,
+            limit,
+            ...otherParams
+        },
+    });
+
+    return response.data;
+};

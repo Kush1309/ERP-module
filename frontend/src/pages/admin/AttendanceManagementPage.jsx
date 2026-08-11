@@ -108,9 +108,16 @@ function AttendanceManagementPage() {
                 </div>
 
                 {/* Placeholder Button explicitly requested */}
-                <Button type="button" variant="secondary" className="min-w-[150px] whitespace-nowrap opacity-50 cursor-not-allowed">
-                    + Mark Attendance
-                </Button>
+                <div className="flex flex-col sm:flex-row gap-3">
+                    <Button type="button" variant="secondary" className="min-w-[150px] whitespace-nowrap opacity-50 cursor-not-allowed">
+                        + Mark Attendance
+                    </Button>
+                    <Link to="/admin/attendance/report">
+                        <Button type="button" className="w-full sm:w-auto">
+                            Attendance Report
+                        </Button>
+                    </Link>
+                </div>
             </div>
 
             {/* Filters Section */}

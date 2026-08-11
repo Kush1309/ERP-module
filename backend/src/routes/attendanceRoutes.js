@@ -10,7 +10,8 @@ const {
     getTeacherAttendanceHistory,
     updateTeacherAttendance,
     getTeacherAttendanceReport,
-    getMyAttendanceHistory
+    getMyAttendanceHistory,
+    getAdminAttendanceReport
 } = require('../controllers/attendanceController');
 const { authenticateUser, authorizeRoles } = require('../middlewares/auth');
 const { ROLES } = require('../constants/roles');
@@ -95,6 +96,13 @@ router.get(
     authenticateUser,
     authorizeRoles(ROLES.ADMIN),
     getAttendanceById
+);
+
+router.get(
+    '/admin/report',
+    authenticateUser,
+    authorizeRoles(ROLES.ADMIN),
+    getAdminAttendanceReport
 );
 
 router.patch(

@@ -187,7 +187,7 @@ const getMyAttendanceHistory = async (userId, queryOpts = {}) => {
     return {
         data: attendances.map(a => ({
             ...a,
-            student: student // Mock minimal populate if frontend expects it, or leave raw. The table just needs date/status.
+            student: student
         })),
         summary,
         pagination: {
@@ -203,7 +203,6 @@ const updateAttendance = async (id, updateData) => {
     if (!mongoose.Types.ObjectId.isValid(id)) {
         throw new AppError('Invalid attendance ID', 400);
     }
-
     const attendance = await Attendance.findById(id);
     if (!attendance) {
         throw new AppError('Attendance record not found', 404);
@@ -620,6 +619,154 @@ const updateTeacherAttendance = async (userId, attendanceId, status) => {
     return attendance;
 };
 
+const getAdminAttendanceReport = async (queryOpts = {}) => {
+    const { startDate, endDate, status, search } = queryOpts;
+    const page = parseInt(queryOpts.page, 10) || 1;
+    const limit = parseInt(queryOpts.limit, 10) || 10;
+
+    // Explicit static string conversion to prevent NoSQL object injection
+    const classFilter = queryOpts.class ? String(queryOpts.class) : undefined;
+    const sectionFilter = queryOpts.section ? String(queryOpts.section) : undefined;
+
+    // 1. Resolve Students Boundary
+    const studentQuery = {};
+    if (classFilter) studentQuery.class = classFilter;
+    if (sectionFilter) studentQuery.section = sectionFilter;
+
+    if (search) {
+        const searchRegex = new RegExp(String(search).replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&'), 'i');
+        studentQuery.$or = [
+            { firstName: searchRegex },
+            { lastName: searchRegex },
+            { rollNumber: searchRegex },
+            { studentId: searchRegex }
+        ];
+    }
+
+    const totalStudents = await Student.countDocuments(studentQuery);
+
+    const safePage = Math.max(page, 1);
+    let safeLimit = limit;
+    if (safeLimit < 1) safeLimit = 10;
+    if (safeLimit > 100) safeLimit = 100;
+    const skip = (safePage - 1) * safeLimit;
+
+    // Get paginated target students
+    const paginatedStudents = await Student.find(studentQuery)
+        .select('firstName lastName studentId rollNumber class section')
+        .skip(skip)
+        .limit(safeLimit)
+        .sort({ studentId: 1 })
+        .lean();
+
+    // Get all authorized student IDs for the global aggregations
+    const allMatchingStudents = await Student.find(studentQuery, '_id').lean();
+    const allStudentIds = allMatchingStudents.map(s => s._id);
+
+    // 2. Attendance Date/Status Filter
+    const attFilter = {};
+    if (startDate || endDate) {
+        attFilter.date = {};
+        if (startDate) {
+            const startD = new Date(startDate);
+            if (isNaN(startD)) throw new AppError('Invalid start date', 400);
+            startD.setUTCHours(0, 0, 0, 0);
+            attFilter.date.$gte = startD;
+        }
+        if (endDate) {
+            const endD = new Date(endDate);
+            if (isNaN(endD)) throw new AppError('Invalid end date', 400);
+            endD.setUTCHours(23, 59, 59, 999);
+            attFilter.date.$lte = endD;
+        }
+        if (attFilter.date.$gte && attFilter.date.$lte && attFilter.date.$gte > attFilter.date.$lte) {
+            throw new AppError('Start date cannot be after end date', 400);
+        }
+    }
+
+    if (status) {
+        if (status !== 'PRESENT' && status !== 'ABSENT') {
+            throw new AppError('Invalid status filter', 400);
+        }
+        attFilter.status = status;
+    }
+
+    // 3. Global Summary Aggregation
+    const globalFilter = { ...attFilter, student: { $in: allStudentIds } };
+
+    const summaryAgg = await Attendance.aggregate([
+        { $match: globalFilter },
+        {
+            $group: {
+                _id: null,
+                totalRecords: { $sum: 1 },
+                present: { $sum: { $cond: [{ $eq: ["$status", "PRESENT"] }, 1, 0] } },
+                absent: { $sum: { $cond: [{ $eq: ["$status", "ABSENT"] }, 1, 0] } }
+            }
+        }
+    ]);
+
+    const summaryRaw = summaryAgg.length > 0 ? summaryAgg[0] : { totalRecords: 0, present: 0, absent: 0 };
+    const percentage = summaryRaw.totalRecords > 0
+        ? Number(((summaryRaw.present / summaryRaw.totalRecords) * 100).toFixed(2))
+        : 0;
+
+    const summary = {
+        totalStudents,
+        totalRecords: summaryRaw.totalRecords,
+        present: summaryRaw.present,
+        absent: summaryRaw.absent,
+        percentage
+    };
+
+    // 4. Paginated Data Array Aggregation
+    const pageStudentIds = paginatedStudents.map(s => s._id);
+    const pageAttFilter = { ...attFilter, student: { $in: pageStudentIds } };
+
+    const pageAgg = await Attendance.aggregate([
+        { $match: pageAttFilter },
+        {
+            $group: {
+                _id: "$student",
+                present: { $sum: { $cond: [{ $eq: ["$status", "PRESENT"] }, 1, 0] } },
+                absent: { $sum: { $cond: [{ $eq: ["$status", "ABSENT"] }, 1, 0] } }
+            }
+        }
+    ]);
+
+    const attMap = {};
+    pageAgg.forEach(p => { attMap[p._id.toString()] = p; });
+
+    const data = paginatedStudents.map(st => {
+        const ag = attMap[st._id.toString()] || { present: 0, absent: 0 };
+        const stTotal = ag.present + ag.absent;
+        const stPercentage = stTotal > 0 ? Number(((ag.present / stTotal) * 100).toFixed(2)) : 0;
+
+        return {
+            studentId: st.studentId,
+            name: `${st.firstName} ${st.lastName}`,
+            rollNumber: st.rollNumber,
+            class: st.class,
+            section: st.section,
+            total: stTotal,
+            present: ag.present,
+            absent: ag.absent,
+            percentage: stPercentage
+        };
+    });
+
+    return {
+        data,
+        summary,
+        pagination: {
+            total: totalStudents,
+            page: safePage,
+            limit: safeLimit,
+            totalPages: Math.ceil(totalStudents / safeLimit)
+        }
+    };
+};
+
 module.exports = {
     createAttendance,
     getAttendances,
@@ -631,5 +778,6 @@ module.exports = {
     getTeacherAttendanceHistory,
     updateTeacherAttendance,
     getTeacherAttendanceReport,
-    getMyAttendanceHistory
+    getMyAttendanceHistory,
+    getAdminAttendanceReport
 };

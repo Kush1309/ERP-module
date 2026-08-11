@@ -62,6 +62,24 @@ const getMyAttendanceHistory = asyncHandler(async (req, res) => {
     });
 });
 
+const getAdminAttendanceReport = asyncHandler(async (req, res) => {
+    // Explicit extraction over passing req.query to prevent injection
+    const { startDate, endDate, status, search, page, limit } = req.query;
+    const classFilter = req.query.class;
+    const sectionFilter = req.query.section;
+
+    const result = await attendanceService.getAdminAttendanceReport({
+        startDate, endDate, status, search, page, limit, class: classFilter, section: sectionFilter
+    });
+
+    res.status(200).json({
+        success: true,
+        data: result.data,
+        summary: result.summary,
+        pagination: result.pagination
+    });
+});
+
 const getAttendanceById = asyncHandler(async (req, res) => {
     const { id } = req.params;
     const attendance = await attendanceService.getAttendanceById(id);
@@ -164,5 +182,6 @@ module.exports = {
     getTeacherAttendanceHistory,
     updateTeacherAttendance,
     getTeacherAttendanceReport,
-    getMyAttendanceHistory
+    getMyAttendanceHistory,
+    getAdminAttendanceReport
 };
