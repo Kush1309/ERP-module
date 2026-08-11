@@ -10,5 +10,6 @@ router.get('/:id', authenticateUser, authorizeRoles(ROLES.ADMIN), controller.get
 
 // Only ADMIN can create Teacher accounts
 router.post('/', authenticateUser, authorizeRoles(ROLES.ADMIN), controller.createTeacher);
+router.put('/:id', authenticateUser, authorizeRoles(ROLES.ADMIN), controller.updateTeacher);
 
 module.exports = router;

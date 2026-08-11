@@ -77,8 +77,22 @@ const getTeacherById = asyncHandler(async (req, res) => {
     });
 });
 
+// PUT /api/teachers/:id
+const updateTeacher = asyncHandler(async (req, res) => {
+    const updatedTeacher = await teacherService.updateTeacherById(req.params.id, req.body);
+
+    res.status(200).json({
+        success: true,
+        message: 'Teacher updated successfully',
+        data: {
+            teacher: updatedTeacher
+        }
+    });
+});
+
 module.exports = {
     createTeacher,
     getTeachers,
-    getTeacherById
+    getTeacherById,
+    updateTeacher
 };

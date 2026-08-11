@@ -200,8 +200,50 @@ const getTeacherById = async (id) => {
     return teacher;
 };
 
+const updateTeacherById = async (id, rawData) => {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+        throw new AppError('Invalid Teacher ID format', 400);
+    }
+
+    const whitelist = [
+        'firstName', 'lastName', 'email', 'phone', 'assignedClass', 'assignedSection'
+    ];
+
+    const safeUpdate = {};
+    Object.keys(rawData).forEach(key => {
+        if (whitelist.includes(key)) {
+            safeUpdate[key] = rawData[key];
+        }
+    });
+
+    if (Object.keys(safeUpdate).length === 0) {
+        throw new AppError('No valid editable fields provided for update', 400);
+    }
+
+    try {
+        const teacher = await Teacher.findByIdAndUpdate(
+            id,
+            { $set: safeUpdate },
+            { new: true, runValidators: true }
+        ).populate('user', 'loginId role isActive mustChangePassword').lean();
+
+        if (!teacher) {
+            throw new AppError('Teacher not found', 404);
+        }
+
+        return teacher;
+    } catch (error) {
+        if (error.code === 11000) {
+            const duplicateField = Object.keys(error.keyValue || {})[0] || 'Field';
+            throw new AppError(`${duplicateField} already exists.`, 409);
+        }
+        throw error;
+    }
+};
+
 module.exports = {
     createTeacherAccount,
     getTeachersList,
-    getTeacherById
+    getTeacherById,
+    updateTeacherById
 };
