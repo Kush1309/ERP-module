@@ -140,3 +140,8 @@ export const deleteAdminAttendance = async (id) => {
     const response = await apiClient.delete(`/attendance/admin/records/${id}`);
     return response.data;
 };
+
+export const getAdminAttendanceAnalytics = async (params = {}) => {
+    const response = await apiClient.get('/attendance/admin/analytics', { params });
+    return response.data;
+};

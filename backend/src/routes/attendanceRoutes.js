@@ -15,7 +15,8 @@ const {
     getAdminAttendanceRecords,
     getAdminAttendanceById,
     updateAdminAttendance,
-    deleteAdminAttendance
+    deleteAdminAttendance,
+    getAdminAttendanceAnalytics
 } = require('../controllers/attendanceController');
 const { authenticateUser, authorizeRoles } = require('../middlewares/auth');
 const { ROLES } = require('../constants/roles');
@@ -107,6 +108,13 @@ router.get(
     authenticateUser,
     authorizeRoles(ROLES.ADMIN),
     getAdminAttendanceReport
+);
+
+router.get(
+    '/admin/analytics',
+    authenticateUser,
+    authorizeRoles(ROLES.ADMIN),
+    getAdminAttendanceAnalytics
 );
 
 router.get(

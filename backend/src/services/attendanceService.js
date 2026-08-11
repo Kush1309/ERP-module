@@ -918,6 +918,167 @@ const deleteAdminAttendance = async (id) => {
     return { success: true };
 };
 
+const getAdminAttendanceAnalytics = async (queryOpts = {}) => {
+    const { startDate, endDate } = queryOpts;
+    const classFilter = queryOpts.class ? String(queryOpts.class) : undefined;
+    const sectionFilter = queryOpts.section ? String(queryOpts.section) : undefined;
+
+    // 1. Resolve Students Boundary
+    const studentQuery = {};
+    if (classFilter) studentQuery.class = classFilter;
+    if (sectionFilter) studentQuery.section = sectionFilter;
+
+    // We only need to resolve the IDs for attendance match
+    const students = await Student.find(studentQuery, '_id').lean();
+    const studentIds = students.map(s => s._id);
+
+    // If no students match, return early with zero data
+    if (studentIds.length === 0) {
+        return {
+            summary: { totalRecords: 0, present: 0, absent: 0, percentage: 0 },
+            classSummary: [],
+            sectionSummary: [],
+            dailyTrend: []
+        };
+    }
+
+    // 2. Attendance Date Filter
+    const attFilter = { student: { $in: studentIds } };
+    if (startDate || endDate) {
+        attFilter.date = {};
+        if (startDate) {
+            const startD = new Date(startDate);
+            if (isNaN(startD)) throw new AppError('Invalid start date', 400);
+            startD.setUTCHours(0, 0, 0, 0);
+            attFilter.date.$gte = startD;
+        }
+        if (endDate) {
+            const endD = new Date(endDate);
+            if (isNaN(endD)) throw new AppError('Invalid end date', 400);
+            endD.setUTCHours(23, 59, 59, 999);
+            attFilter.date.$lte = endD;
+        }
+        if (attFilter.date.$gte && attFilter.date.$lte && attFilter.date.$gte > attFilter.date.$lte) {
+            throw new AppError('Start date cannot be after end date', 400);
+        }
+    }
+
+    // Since we need class/section logic, we must do a $lookup to join the Student collection
+    // in order to group by class and section.
+
+    const pipeline = [
+        { $match: attFilter },
+        {
+            $lookup: {
+                from: 'users', // Note: In this architecture, Student might be in 'users' collection with role 'STUDENT'
+                // Wait, checking previous code, Student.collection is 'students'. The schema model is 'Student'.
+                // By Mongoose default, model 'Student' goes to 'students'.
+                from: 'students',
+                localField: 'student',
+                foreignField: '_id',
+                as: 'studentDoc'
+            }
+        },
+        { $unwind: '$studentDoc' }
+    ];
+
+    const results = await Attendance.aggregate([
+        ...pipeline,
+        {
+            $facet: {
+                overall: [
+                    {
+                        $group: {
+                            _id: null,
+                            totalRecords: { $sum: 1 },
+                            present: { $sum: { $cond: [{ $eq: ["$status", "PRESENT"] }, 1, 0] } },
+                            absent: { $sum: { $cond: [{ $eq: ["$status", "ABSENT"] }, 1, 0] } }
+                        }
+                    }
+                ],
+                byClass: [
+                    {
+                        $group: {
+                            _id: "$studentDoc.class",
+                            totalRecords: { $sum: 1 },
+                            present: { $sum: { $cond: [{ $eq: ["$status", "PRESENT"] }, 1, 0] } },
+                            absent: { $sum: { $cond: [{ $eq: ["$status", "ABSENT"] }, 1, 0] } }
+                        }
+                    },
+                    { $sort: { _id: 1 } }
+                ],
+                bySection: [
+                    {
+                        $group: {
+                            _id: "$studentDoc.section",
+                            totalRecords: { $sum: 1 },
+                            present: { $sum: { $cond: [{ $eq: ["$status", "PRESENT"] }, 1, 0] } },
+                            absent: { $sum: { $cond: [{ $eq: ["$status", "ABSENT"] }, 1, 0] } }
+                        }
+                    },
+                    { $sort: { _id: 1 } }
+                ],
+                dailyTrend: [
+                    {
+                        $group: {
+                            _id: { $dateToString: { format: "%Y-%m-%d", date: "$date" } },
+                            totalRecords: { $sum: 1 },
+                            present: { $sum: { $cond: [{ $eq: ["$status", "PRESENT"] }, 1, 0] } },
+                            absent: { $sum: { $cond: [{ $eq: ["$status", "ABSENT"] }, 1, 0] } }
+                        }
+                    },
+                    { $sort: { _id: 1 } }
+                ]
+            }
+        }
+    ]);
+
+    const facet = results[0];
+
+    // Format Overall
+    const overallRaw = facet.overall[0] || { totalRecords: 0, present: 0, absent: 0 };
+    const summary = {
+        totalRecords: overallRaw.totalRecords,
+        present: overallRaw.present,
+        absent: overallRaw.absent,
+        percentage: overallRaw.totalRecords > 0 ? Number(((overallRaw.present / overallRaw.totalRecords) * 100).toFixed(2)) : 0
+    };
+
+    // Format Class
+    const classSummary = facet.byClass.map(c => ({
+        class: c._id || 'Unassigned',
+        totalRecords: c.totalRecords,
+        present: c.present,
+        absent: c.absent,
+        percentage: c.totalRecords > 0 ? Number(((c.present / c.totalRecords) * 100).toFixed(2)) : 0
+    }));
+
+    // Format Section
+    const sectionSummary = facet.bySection.map(s => ({
+        section: s._id || 'Unassigned',
+        totalRecords: s.totalRecords,
+        present: s.present,
+        absent: s.absent,
+        percentage: s.totalRecords > 0 ? Number(((s.present / s.totalRecords) * 100).toFixed(2)) : 0
+    }));
+
+    // Format Trend
+    const dailyTrend = facet.dailyTrend.map(d => ({
+        date: d._id,
+        totalRecords: d.totalRecords,
+        present: d.present,
+        absent: d.absent,
+        percentage: d.totalRecords > 0 ? Number(((d.present / d.totalRecords) * 100).toFixed(2)) : 0
+    }));
+
+    return {
+        summary,
+        classSummary,
+        sectionSummary,
+        dailyTrend
+    };
+};
+
 module.exports = {
     createAttendance,
     getAttendances,
@@ -934,5 +1095,6 @@ module.exports = {
     getAdminAttendanceRecords,
     getAdminAttendanceById,
     updateAdminAttendance,
-    deleteAdminAttendance
+    deleteAdminAttendance,
+    getAdminAttendanceAnalytics
 };

@@ -206,6 +206,21 @@ const deleteAdminAttendance = asyncHandler(async (req, res) => {
     res.status(200).json({ success: true, message: 'Attendance record deleted successfully' });
 });
 
+const getAdminAttendanceAnalytics = asyncHandler(async (req, res) => {
+    const { startDate, endDate } = req.query;
+    const classFilter = req.query.class;
+    const sectionFilter = req.query.section;
+
+    const analytics = await attendanceService.getAdminAttendanceAnalytics({
+        startDate, endDate, class: classFilter, section: sectionFilter
+    });
+
+    res.status(200).json({
+        success: true,
+        data: analytics
+    });
+});
+
 module.exports = {
     createAttendance,
     getAttendances,
@@ -222,5 +237,6 @@ module.exports = {
     getAdminAttendanceRecords,
     getAdminAttendanceById,
     updateAdminAttendance,
-    deleteAdminAttendance
+    deleteAdminAttendance,
+    getAdminAttendanceAnalytics
 };

@@ -17,6 +17,7 @@ import StudentDetailsPage from './pages/admin/StudentDetailsPage';
 import EditStudentPage from './pages/admin/EditStudentPage';
 import AttendanceManagementPage from './pages/admin/AttendanceManagementPage';
 import AttendanceReportPage from './pages/admin/AttendanceReportPage';
+import AttendanceAnalyticsPage from './pages/admin/AttendanceAnalyticsPage';
 import TeacherManagementPage from './pages/admin/TeacherManagementPage';
 import AddTeacherPage from './pages/admin/AddTeacherPage';
 import TeacherDetailsPage from './pages/admin/TeacherDetailsPage';
@@ -102,6 +103,15 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
               <AttendanceReportPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/admin/attendance/analytics"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+              <AttendanceAnalyticsPage />
             </ProtectedRoute>
           }
         />
