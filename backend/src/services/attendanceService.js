@@ -1079,6 +1079,107 @@ const getAdminAttendanceAnalytics = async (queryOpts = {}) => {
     };
 };
 
+const flattenStudentObj = (s) => `${s.firstName || ''} ${s.lastName || ''} ${s.studentId || ''} ${s.rollNumber || ''}`.toLowerCase();
+
+const exportAdminAttendance = async (queryOpts = {}) => {
+    const { startDate, endDate, status, search } = queryOpts;
+    const classFilter = queryOpts.class ? String(queryOpts.class) : undefined;
+    const sectionFilter = queryOpts.section ? String(queryOpts.section) : undefined;
+
+    // 1. Resolve Students Boundary
+    const studentQuery = {};
+    if (classFilter) studentQuery.class = classFilter;
+    if (sectionFilter) studentQuery.section = sectionFilter;
+
+    // We fetch broader fields because we need them for CSV and for regex search (if supplied)
+    const students = await Student.find(studentQuery, '_id firstName lastName studentId class section rollNumber').lean();
+    let validStudents = students;
+
+    if (search) {
+        const safeSearch = String(search).replace(/[.*+?^${}()|[\]\\]/g, '\\$&').toLowerCase();
+        validStudents = students.filter(s => flattenStudentObj(s).includes(safeSearch));
+    }
+    const studentIds = validStudents.map(s => s._id);
+
+    // 2. Attendance Date & Status Filter
+    const attFilter = { student: { $in: studentIds } };
+
+    if (status && (status === 'PRESENT' || status === 'ABSENT')) {
+        attFilter.status = status;
+    }
+
+    if (startDate || endDate) {
+        attFilter.date = {};
+        if (startDate) {
+            const startD = new Date(startDate);
+            if (isNaN(startD)) throw new AppError('Invalid start date', 400);
+            startD.setUTCHours(0, 0, 0, 0);
+            attFilter.date.$gte = startD;
+        }
+        if (endDate) {
+            const endD = new Date(endDate);
+            if (isNaN(endD)) throw new AppError('Invalid end date', 400);
+            endD.setUTCHours(23, 59, 59, 999);
+            attFilter.date.$lte = endD;
+        }
+        if (attFilter.date.$gte && attFilter.date.$lte && attFilter.date.$gte > attFilter.date.$lte) {
+            throw new AppError('Start date cannot be after end date', 400);
+        }
+    }
+
+    const records = await Attendance.find(attFilter)
+        .populate('student', 'firstName lastName studentId class section rollNumber')
+        .sort({ date: -1 }) // Sort date descending
+        .lean();
+
+    // Secondary sort by student firstName ascending
+    records.sort((a, b) => {
+        if (a.date > b.date) return -1;
+        if (a.date < b.date) return 1;
+        const nameA = (a.student?.firstName || '').toLowerCase();
+        const nameB = (b.student?.firstName || '').toLowerCase();
+        if (nameA < nameB) return -1;
+        if (nameA > nameB) return 1;
+        return 0;
+    });
+
+    // 3. Generate CSV
+    const headers = ['Attendance Date', 'Student ID', 'Student Name', 'Roll Number', 'Class', 'Section', 'Status'];
+
+    const escapeCsvValue = (val) => {
+        if (val === null || val === undefined) return '';
+        let strVal = String(val);
+        // Protect against spreadsheet formula injection
+        if (/^[=+\-@]/.test(strVal)) {
+            strVal = "'" + strVal;
+        }
+        // Escape quotes and wrap in quotes if there is a comma, quote or newline
+        if (strVal.includes(',') || strVal.includes('"') || strVal.includes('\n')) {
+            strVal = `"${strVal.replace(/"/g, '""')}"`;
+        }
+        return strVal;
+    };
+
+    const csvRows = [headers.join(',')];
+
+    for (const record of records) {
+        if (!record.student) continue;
+        const s = record.student;
+        const row = [
+            escapeCsvValue(record.date ? record.date.toISOString().split('T')[0] : ''),
+            escapeCsvValue(s.studentId),
+            escapeCsvValue(`${s.firstName || ''} ${s.lastName || ''}`.trim()),
+            escapeCsvValue(s.rollNumber),
+            escapeCsvValue(s.class),
+            escapeCsvValue(s.section),
+            escapeCsvValue(record.status)
+        ];
+        csvRows.push(row.join(','));
+    }
+
+    return csvRows.join('\n');
+};
+
 module.exports = {
     createAttendance,
     getAttendances,
@@ -1096,5 +1197,6 @@ module.exports = {
     getAdminAttendanceById,
     updateAdminAttendance,
     deleteAdminAttendance,
-    getAdminAttendanceAnalytics
+    getAdminAttendanceAnalytics,
+    exportAdminAttendance
 };

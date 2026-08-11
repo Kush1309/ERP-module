@@ -221,6 +221,21 @@ const getAdminAttendanceAnalytics = asyncHandler(async (req, res) => {
     });
 });
 
+const exportAdminAttendance = asyncHandler(async (req, res) => {
+    const { startDate, endDate, status, search } = req.query;
+    const classFilter = req.query.class;
+    const sectionFilter = req.query.section;
+
+    const csvData = await attendanceService.exportAdminAttendance({
+        startDate, endDate, status, search, class: classFilter, section: sectionFilter
+    });
+
+    const dateStr = new Date().toISOString().split('T')[0];
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="attendance-export-${dateStr}.csv"`);
+    res.status(200).send(csvData);
+});
+
 module.exports = {
     createAttendance,
     getAttendances,
@@ -238,5 +253,6 @@ module.exports = {
     getAdminAttendanceById,
     updateAdminAttendance,
     deleteAdminAttendance,
-    getAdminAttendanceAnalytics
+    getAdminAttendanceAnalytics,
+    exportAdminAttendance
 };

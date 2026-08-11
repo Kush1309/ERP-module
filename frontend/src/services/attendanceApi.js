@@ -145,3 +145,11 @@ export const getAdminAttendanceAnalytics = async (params = {}) => {
     const response = await apiClient.get('/attendance/admin/analytics', { params });
     return response.data;
 };
+
+export const exportAdminAttendance = async (params = {}) => {
+    const response = await apiClient.get('/attendance/admin/export', {
+        params,
+        responseType: 'blob'
+    });
+    return response.data;
+};

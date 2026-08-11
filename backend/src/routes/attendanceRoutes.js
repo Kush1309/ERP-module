@@ -16,7 +16,8 @@ const {
     getAdminAttendanceById,
     updateAdminAttendance,
     deleteAdminAttendance,
-    getAdminAttendanceAnalytics
+    getAdminAttendanceAnalytics,
+    exportAdminAttendance
 } = require('../controllers/attendanceController');
 const { authenticateUser, authorizeRoles } = require('../middlewares/auth');
 const { ROLES } = require('../constants/roles');
@@ -115,6 +116,13 @@ router.get(
     authenticateUser,
     authorizeRoles(ROLES.ADMIN),
     getAdminAttendanceAnalytics
+);
+
+router.get(
+    '/admin/export',
+    authenticateUser,
+    authorizeRoles(ROLES.ADMIN),
+    exportAdminAttendance
 );
 
 router.get(

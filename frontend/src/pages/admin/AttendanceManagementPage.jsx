@@ -7,7 +7,8 @@ import {
     getAdminAttendanceRecords,
     getAdminAttendanceById,
     updateAdminAttendance,
-    deleteAdminAttendance
+    deleteAdminAttendance,
+    exportAdminAttendance
 } from '../../services/attendanceApi';
 
 const DEFAULT_LIMIT = 10;
@@ -43,6 +44,7 @@ export default function AttendanceManagementPage() {
     const [isSaving, setIsSaving] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const [modalError, setModalError] = useState('');
+    const [isExporting, setIsExporting] = useState(false);
 
     const loadAttendances = useCallback(
         async (nextPage = 1, currentFilters = {}) => {
@@ -101,6 +103,26 @@ export default function AttendanceManagementPage() {
     const clearFilters = () => {
         setFilters({ startDate: '', endDate: '', status: '', class: '', section: '', search: '' });
         setPage(1);
+    };
+
+    const handleExport = async () => {
+        setIsExporting(true);
+        setError('');
+        try {
+            const blob = await exportAdminAttendance(filters);
+            const url = window.URL.createObjectURL(new Blob([blob]));
+            const link = document.createElement('a');
+            link.href = url;
+            const dateStr = new Date().toISOString().split('T')[0];
+            link.setAttribute('download', `attendance-export-${dateStr}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            link.parentNode.removeChild(link);
+        } catch (err) {
+            setError(err.response?.data?.message || 'Failed to export attendance records. Please try again.');
+        } finally {
+            setIsExporting(false);
+        }
     };
 
     const hasActiveFilters = Object.values(filters).some(val => val !== '');
@@ -182,6 +204,15 @@ export default function AttendanceManagementPage() {
                             Analytics Dashboard
                         </Button>
                     </Link>
+                    <Button
+                        type="button"
+                        variant="secondary"
+                        className="w-full sm:w-auto disabled:opacity-50"
+                        onClick={handleExport}
+                        disabled={isExporting}
+                    >
+                        {isExporting ? 'Exporting...' : 'Export CSV'}
+                    </Button>
                 </div>
             </div>
 
