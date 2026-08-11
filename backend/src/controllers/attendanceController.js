@@ -94,6 +94,20 @@ const createBulkAttendance = asyncHandler(async (req, res) => {
     });
 });
 
+const getTeacherAttendanceHistory = asyncHandler(async (req, res) => {
+    const userId = req.user.id;
+    const { page, limit, date, student, status } = req.query;
+
+    const result = await attendanceService.getTeacherAttendanceHistory(userId, { page, limit, date, student, status });
+
+    res.status(200).json({
+        success: true,
+        data: result.attendances,
+        summary: result.summary,
+        pagination: result.pagination
+    });
+});
+
 module.exports = {
     createAttendance,
     getAttendances,
@@ -101,5 +115,6 @@ module.exports = {
     getAttendanceById,
     updateAttendance,
     getTeacherRoster,
-    createBulkAttendance
+    createBulkAttendance,
+    getTeacherAttendanceHistory
 };

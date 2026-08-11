@@ -52,3 +52,17 @@ export const createBulkAttendance = async (bulkData) => {
     const response = await apiClient.post('/attendance/bulk', bulkData);
     return response.data;
 };
+
+export const getTeacherHistory = async (params = {}) => {
+    const { page = 1, limit = 10, ...otherParams } = params;
+
+    const response = await apiClient.get('/attendance/teacher/history', {
+        params: {
+            page,
+            limit,
+            ...otherParams
+        },
+    });
+
+    return response.data;
+};

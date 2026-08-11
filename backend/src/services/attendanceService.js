@@ -227,6 +227,101 @@ const createBulkAttendance = async (userId, bulkData) => {
     return inserted;
 };
 
+const getTeacherAttendanceHistory = async (userId, queryOpts = {}) => {
+    const { page = 1, limit = 10, date, student, status } = queryOpts;
+
+    // 1. Resolve teacher identity and authorized roster mapping based on class/section
+    const teacher = await Teacher.findOne({ user: userId }).lean();
+    if (!teacher) {
+        throw new AppError('Teacher profile not found', 403);
+    }
+
+    const studentQuery = { class: teacher.assignedClass, section: teacher.assignedSection };
+
+    if (student) {
+        // Very safe simple escape for basic Regex
+        const searchRegex = new RegExp(student.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&'), 'i');
+        studentQuery.$or = [
+            { firstName: searchRegex },
+            { lastName: searchRegex },
+            { rollNumber: searchRegex },
+            { studentId: searchRegex }
+        ];
+    }
+
+    const authorizedStudents = await Student.find(studentQuery, '_id').lean();
+    const authorizedStudentIds = authorizedStudents.map(s => String(s._id));
+
+    // 2. Base filter constrained to ONLY authorized students
+    const filter = {
+        student: { $in: authorizedStudentIds }
+    };
+
+    if (status && (status === 'PRESENT' || status === 'ABSENT')) {
+        filter.status = status;
+    }
+
+    if (date) {
+        const queryDate = new Date(date);
+        if (isNaN(queryDate)) throw new AppError('Invalid date format', 400);
+        queryDate.setUTCHours(0, 0, 0, 0);
+        filter.date = queryDate;
+    }
+
+    // 3. Pagination values
+    const safePage = Math.max(parseInt(page) || 1, 1);
+    let safeLimit = parseInt(limit) || 10;
+    if (safeLimit < 1) safeLimit = 10;
+    if (safeLimit > 100) safeLimit = 100;
+    const skip = (safePage - 1) * safeLimit;
+
+    // 4. Fetch Paginated Records and Total Count concurrently
+    const [attendances, total] = await Promise.all([
+        Attendance.find(filter)
+            .populate('student', 'firstName lastName studentId class section rollNumber')
+            .skip(skip)
+            .limit(safeLimit)
+            .sort({ date: -1 })
+            .lean(),
+        Attendance.countDocuments(filter)
+    ]);
+
+    // 5. Build Aggregation Pipeline for Summary
+    // Note: The summary counts EVERYTHING matching the filter within the Teacher's scope, ignoring skip/limit.
+    const summaryAgg = await Attendance.aggregate([
+        { $match: filter },
+        {
+            $group: {
+                _id: null,
+                total: { $sum: 1 },
+                present: { $sum: { $cond: [{ $eq: ["$status", "PRESENT"] }, 1, 0] } },
+                absent: { $sum: { $cond: [{ $eq: ["$status", "ABSENT"] }, 1, 0] } }
+            }
+        }
+    ]);
+
+    const summaryRaw = summaryAgg.length > 0 ? summaryAgg[0] : { total: 0, present: 0, absent: 0 };
+    const percentage = summaryRaw.total > 0 ? Math.round((summaryRaw.present / summaryRaw.total) * 100) : 0;
+
+    const summary = {
+        total: summaryRaw.total,
+        present: summaryRaw.present,
+        absent: summaryRaw.absent,
+        percentage
+    };
+
+    return {
+        attendances,
+        summary,
+        pagination: {
+            total,
+            page: safePage,
+            limit: safeLimit,
+            pages: Math.ceil(total / safeLimit)
+        }
+    };
+};
+
 module.exports = {
     createAttendance,
     getAttendances,
@@ -234,5 +329,6 @@ module.exports = {
     getMyAttendance,
     updateAttendance,
     getTeacherRoster,
-    createBulkAttendance
+    createBulkAttendance,
+    getTeacherAttendanceHistory
 };
