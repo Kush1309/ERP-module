@@ -106,6 +106,99 @@ const getMyAttendance = async (userId, query = {}) => {
     return await getAttendances(forcedQuery);
 };
 
+const getMyAttendanceHistory = async (userId, queryOpts = {}) => {
+    const { startDate, endDate, status, page = 1, limit = 10 } = queryOpts;
+
+    // 1. Resolve Auth Student
+    const student = await Student.findOne({ user: userId }).lean();
+    if (!student) {
+        throw new AppError('Student profile not found based on authenticated user', 404);
+    }
+
+    // 2. Match logic
+    const filter = { student: student._id };
+
+    if (startDate || endDate) {
+        filter.date = {};
+        if (startDate) {
+            const startD = new Date(startDate);
+            if (isNaN(startD)) throw new AppError('Invalid start date', 400);
+            startD.setUTCHours(0, 0, 0, 0);
+            filter.date.$gte = startD;
+        }
+        if (endDate) {
+            const endD = new Date(endDate);
+            if (isNaN(endD)) throw new AppError('Invalid end date', 400);
+            endD.setUTCHours(23, 59, 59, 999);
+            filter.date.$lte = endD;
+        }
+        if (filter.date.$gte && filter.date.$lte && filter.date.$gte > filter.date.$lte) {
+            throw new AppError('Start date cannot be after end date', 400);
+        }
+    }
+
+    if (status) {
+        if (status !== 'PRESENT' && status !== 'ABSENT') {
+            throw new AppError('Invalid status filter', 400);
+        }
+        filter.status = status;
+    }
+
+    // 3. Pagination setup
+    const safePage = Math.max(parseInt(page) || 1, 1);
+    let safeLimit = parseInt(limit) || 10;
+    if (safeLimit < 1) safeLimit = 10;
+    if (safeLimit > 100) safeLimit = 100;
+    const skip = (safePage - 1) * safeLimit;
+
+    // 4. Data Fetching
+    const [attendances, totalCount] = await Promise.all([
+        Attendance.find(filter)
+            .skip(skip)
+            .limit(safeLimit)
+            .sort({ date: -1 })
+            .lean(),
+        Attendance.countDocuments(filter)
+    ]);
+
+    // 5. Global Summary Aggregation
+    const summaryAgg = await Attendance.aggregate([
+        { $match: filter },
+        {
+            $group: {
+                _id: null,
+                total: { $sum: 1 },
+                present: { $sum: { $cond: [{ $eq: ["$status", "PRESENT"] }, 1, 0] } },
+                absent: { $sum: { $cond: [{ $eq: ["$status", "ABSENT"] }, 1, 0] } }
+            }
+        }
+    ]);
+
+    const summaryRaw = summaryAgg.length > 0 ? summaryAgg[0] : { total: 0, present: 0, absent: 0 };
+    const percentage = summaryRaw.total > 0 ? Number(((summaryRaw.present / summaryRaw.total) * 100).toFixed(2)) : 0;
+
+    const summary = {
+        total: summaryRaw.total,
+        present: summaryRaw.present,
+        absent: summaryRaw.absent,
+        percentage
+    };
+
+    return {
+        data: attendances.map(a => ({
+            ...a,
+            student: student // Mock minimal populate if frontend expects it, or leave raw. The table just needs date/status.
+        })),
+        summary,
+        pagination: {
+            total: totalCount,
+            page: safePage,
+            limit: safeLimit,
+            pages: Math.ceil(totalCount / safeLimit)
+        }
+    };
+};
+
 const updateAttendance = async (id, updateData) => {
     if (!mongoose.Types.ObjectId.isValid(id)) {
         throw new AppError('Invalid attendance ID', 400);
@@ -537,5 +630,6 @@ module.exports = {
     createBulkAttendance,
     getTeacherAttendanceHistory,
     updateTeacherAttendance,
-    getTeacherAttendanceReport
+    getTeacherAttendanceReport,
+    getMyAttendanceHistory
 };

@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import Card from '../../components/Card';
+import Button from '../../components/Button';
 import { getCurrentStudent } from '../../services/studentApi';
 
 function StudentDashboardPage() {
@@ -73,9 +75,14 @@ function StudentDashboardPage() {
 
     return (
         <div className="mx-auto w-full max-w-4xl pb-10">
-            <div className="mb-6">
-                <h1 className="font-display text-3xl font-semibold text-ink-900">Student Dashboard</h1>
-                <p className="mt-2 text-ink-600">Welcome, {firstName || 'Not available'} {lastName || ''}</p>
+            <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                    <h1 className="font-display text-3xl font-semibold text-ink-900">Student Dashboard</h1>
+                    <p className="mt-2 text-ink-600">Welcome, {firstName || 'Not available'} {lastName || ''}</p>
+                </div>
+                <Link to="/student/attendance">
+                    <Button type="button" variant="secondary">My Attendance</Button>
+                </Link>
             </div>
 
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">

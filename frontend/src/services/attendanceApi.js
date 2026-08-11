@@ -85,3 +85,17 @@ export const getTeacherAttendanceReport = async (params = {}) => {
 
     return response.data;
 };
+
+export const getMyAttendanceHistory = async (params = {}) => {
+    const { page = 1, limit = 10, ...otherParams } = params;
+
+    const response = await apiClient.get('/attendance/me/history', {
+        params: {
+            page,
+            limit,
+            ...otherParams
+        },
+    });
+
+    return response.data;
+};

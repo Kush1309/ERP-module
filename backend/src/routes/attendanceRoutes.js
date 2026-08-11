@@ -9,7 +9,8 @@ const {
     createBulkAttendance,
     getTeacherAttendanceHistory,
     updateTeacherAttendance,
-    getTeacherAttendanceReport
+    getTeacherAttendanceReport,
+    getMyAttendanceHistory
 } = require('../controllers/attendanceController');
 const { authenticateUser, authorizeRoles } = require('../middlewares/auth');
 const { ROLES } = require('../constants/roles');
@@ -25,6 +26,13 @@ router.get(
     authenticateUser,
     authorizeRoles(ROLES.STUDENT),
     getMyAttendance
+);
+
+router.get(
+    '/me/history',
+    authenticateUser,
+    authorizeRoles(ROLES.STUDENT),
+    getMyAttendanceHistory
 );
 
 // ----------------------------------------------------

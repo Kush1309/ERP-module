@@ -46,6 +46,22 @@ const getMyAttendance = asyncHandler(async (req, res) => {
     });
 });
 
+const getMyAttendanceHistory = asyncHandler(async (req, res) => {
+    const userId = req.user.id;
+    const { startDate, endDate, status, page, limit } = req.query;
+
+    const result = await attendanceService.getMyAttendanceHistory(userId, {
+        startDate, endDate, status, page, limit
+    });
+
+    res.status(200).json({
+        success: true,
+        data: result.data,
+        summary: result.summary,
+        pagination: result.pagination
+    });
+});
+
 const getAttendanceById = asyncHandler(async (req, res) => {
     const { id } = req.params;
     const attendance = await attendanceService.getAttendanceById(id);
@@ -147,5 +163,6 @@ module.exports = {
     createBulkAttendance,
     getTeacherAttendanceHistory,
     updateTeacherAttendance,
-    getTeacherAttendanceReport
+    getTeacherAttendanceReport,
+    getMyAttendanceHistory
 };

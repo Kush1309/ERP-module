@@ -9,6 +9,7 @@ import ChangePasswordPage from './pages/ChangePasswordPage';
 import AdminDashboardPage from './pages/AdminDashboardPage';
 import TeacherDashboardPage from './pages/TeacherDashboardPage';
 import StudentDashboardPage from './pages/student/StudentDashboardPage';
+import StudentAttendancePage from './pages/student/StudentAttendancePage';
 import ParentDashboardPage from './pages/ParentDashboardPage';
 import StudentManagementPage from './pages/admin/StudentManagementPage';
 import AddStudentPage from './pages/admin/AddStudentPage';
@@ -162,6 +163,15 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={[ROLES.STUDENT]}>
               <StudentDashboardPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/student/attendance"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.STUDENT]}>
+              <StudentAttendancePage />
             </ProtectedRoute>
           }
         />
