@@ -24,6 +24,11 @@ export const getTeacherById = async (id) => {
     return response.data?.data?.teacher;
 };
 
+export const updateTeacher = async (id, teacherData) => {
+    const response = await apiClient.put(`/teachers/${id}`, teacherData);
+    return response.data?.data?.teacher;
+};
+
 export const activateTeacher = async (id) => {
     const response = await apiClient.patch(`/teachers/${id}/activate`);
     return response.data?.data?.teacher;
