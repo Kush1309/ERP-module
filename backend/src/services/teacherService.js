@@ -241,9 +241,35 @@ const updateTeacherById = async (id, rawData) => {
     }
 };
 
+const toggleTeacherAccountStatus = async (id, isActive) => {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+        throw new AppError('Invalid Teacher ID format', 400);
+    }
+
+    const teacher = await Teacher.findById(id);
+    if (!teacher) {
+        throw new AppError('Teacher not found', 404);
+    }
+
+    const user = await User.findById(teacher.user);
+    if (!user) {
+        throw new AppError('Associated User not found', 404);
+    }
+
+    user.isActive = isActive;
+    await user.save();
+
+    return await Teacher.findById(id).populate('user', 'loginId role isActive mustChangePassword').lean();
+};
+
+const activateTeacherAccount = (id) => toggleTeacherAccountStatus(id, true);
+const deactivateTeacherAccount = (id) => toggleTeacherAccountStatus(id, false);
+
 module.exports = {
     createTeacherAccount,
     getTeachersList,
     getTeacherById,
-    updateTeacherById
+    updateTeacherById,
+    activateTeacherAccount,
+    deactivateTeacherAccount
 };

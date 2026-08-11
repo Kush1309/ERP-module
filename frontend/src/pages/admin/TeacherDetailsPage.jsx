@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import Button from '../../components/Button';
 import Card from '../../components/Card';
-import { getTeacherById } from '../../services/teacherApi';
+import Modal from '../../components/Modal';
+import { getTeacherById, activateTeacher, deactivateTeacher } from '../../services/teacherApi';
 
 function TeacherDetailsPage() {
     const { id } = useParams();
@@ -11,32 +12,63 @@ function TeacherDetailsPage() {
     const [errorStatus, setErrorStatus] = useState(null);
     const [errorMessage, setErrorMessage] = useState('');
 
-    useEffect(() => {
-        const fetchTeacher = async () => {
-            setLoading(true);
-            setErrorStatus(null);
-            setErrorMessage('');
-            try {
-                const teacherData = await getTeacherById(id);
-                setTeacher(teacherData);
-            } catch (err) {
-                const status = err.response?.status;
-                setErrorStatus(status);
-                if (status === 404) {
-                    setErrorMessage('Teacher not found.');
-                } else if (status === 401) {
-                    setErrorMessage('Unauthorized access.');
-                } else if (status === 403) {
-                    setErrorMessage('Access denied.');
-                } else {
-                    setErrorMessage('Unable to load teacher details please check your connection.');
-                }
-            } finally {
-                setLoading(false);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [modalAction, setModalAction] = useState(''); // 'activate' or 'deactivate'
+    const [isActionLoading, setIsActionLoading] = useState(false);
+    const [actionError, setActionError] = useState('');
+
+    const fetchTeacher = async () => {
+        setLoading(true);
+        setErrorStatus(null);
+        setErrorMessage('');
+        try {
+            const teacherData = await getTeacherById(id);
+            setTeacher(teacherData);
+        } catch (err) {
+            const status = err.response?.status;
+            setErrorStatus(status);
+            if (status === 404) {
+                setErrorMessage('Teacher not found.');
+            } else if (status === 401) {
+                setErrorMessage('Unauthorized access.');
+            } else if (status === 403) {
+                setErrorMessage('Access denied.');
+            } else {
+                setErrorMessage('Unable to load teacher details please check your connection.');
             }
-        };
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
         fetchTeacher();
     }, [id]);
+
+    const handleActionClick = (action) => {
+        setModalAction(action);
+        setActionError('');
+        setIsModalOpen(true);
+    };
+
+    const handleConfirmAction = async () => {
+        setIsActionLoading(true);
+        setActionError('');
+        try {
+            if (modalAction === 'activate') {
+                await activateTeacher(id);
+            } else {
+                await deactivateTeacher(id);
+            }
+            setIsModalOpen(false);
+            // Refresh explicitly without browser reload
+            await fetchTeacher();
+        } catch (err) {
+            setActionError(err.response?.data?.message || `Failed to ${modalAction} teacher.`);
+        } finally {
+            setIsActionLoading(false);
+        }
+    };
 
     if (loading) {
         return (
@@ -151,10 +183,62 @@ function TeacherDetailsPage() {
                                     </span>
                                 </div>
                             </div>
+                            <div>
+                                {accountActive ? (
+                                    <Button type="button" variant="secondary" onClick={() => handleActionClick('deactivate')}>
+                                        Deactivate Teacher
+                                    </Button>
+                                ) : (
+                                    <Button type="button" onClick={() => handleActionClick('activate')}>
+                                        Activate Teacher
+                                    </Button>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </Card>
             </div>
+
+            <Modal
+                isOpen={isModalOpen}
+                onClose={() => !isActionLoading && setIsModalOpen(false)}
+                title={modalAction === 'activate' ? 'Activate Teacher?' : 'Deactivate Teacher?'}
+            >
+                <div className="space-y-4">
+                    <p className="text-sm text-ink-600">
+                        {modalAction === 'activate'
+                            ? "This will enable the teacher's account and allow login."
+                            : "This will disable the teacher's account and prevent login."}
+                    </p>
+
+                    {actionError && (
+                        <div className="rounded-md bg-red-50 p-3 text-sm text-red-600">
+                            {actionError}
+                        </div>
+                    )}
+
+                    <div className="flex justify-end gap-3 pt-4">
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={() => setIsModalOpen(false)}
+                            disabled={isActionLoading}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            type="button"
+                            onClick={handleConfirmAction}
+                            disabled={isActionLoading}
+                        >
+                            {isActionLoading
+                                ? (modalAction === 'activate' ? 'Activating...' : 'Deactivating...')
+                                : (modalAction === 'activate' ? 'Activate' : 'Deactivate')
+                            }
+                        </Button>
+                    </div>
+                </div>
+            </Modal>
         </div>
     );
 }

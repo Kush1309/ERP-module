@@ -90,9 +90,35 @@ const updateTeacher = asyncHandler(async (req, res) => {
     });
 });
 
+const activateTeacher = asyncHandler(async (req, res) => {
+    const teacher = await teacherService.activateTeacherAccount(req.params.id);
+
+    res.status(200).json({
+        success: true,
+        message: 'Teacher activated successfully',
+        data: {
+            teacher
+        }
+    });
+});
+
+const deactivateTeacher = asyncHandler(async (req, res) => {
+    const teacher = await teacherService.deactivateTeacherAccount(req.params.id);
+
+    res.status(200).json({
+        success: true,
+        message: 'Teacher deactivated successfully',
+        data: {
+            teacher
+        }
+    });
+});
+
 module.exports = {
     createTeacher,
     getTeachers,
     getTeacherById,
-    updateTeacher
+    updateTeacher,
+    activateTeacher,
+    deactivateTeacher
 };
