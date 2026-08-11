@@ -171,6 +171,41 @@ const getTeacherAttendanceReport = asyncHandler(async (req, res) => {
     });
 });
 
+const getAdminAttendanceRecords = asyncHandler(async (req, res) => {
+    const { startDate, endDate, date, status, search, page, limit } = req.query;
+    const classFilter = req.query.class;
+    const sectionFilter = req.query.section;
+
+    const result = await attendanceService.getAdminAttendanceRecords({
+        startDate, endDate, date, status, search, page, limit, class: classFilter, section: sectionFilter
+    });
+
+    res.status(200).json({
+        success: true,
+        data: result.records,
+        pagination: result.pagination
+    });
+});
+
+const getAdminAttendanceById = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const attendance = await attendanceService.getAdminAttendanceById(id);
+    res.status(200).json({ success: true, data: attendance });
+});
+
+const updateAdminAttendance = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const { status } = req.body;
+    const updated = await attendanceService.updateAdminAttendance(id, status);
+    res.status(200).json({ success: true, data: updated, message: 'Attendance record updated successfully' });
+});
+
+const deleteAdminAttendance = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    await attendanceService.deleteAdminAttendance(id);
+    res.status(200).json({ success: true, message: 'Attendance record deleted successfully' });
+});
+
 module.exports = {
     createAttendance,
     getAttendances,
@@ -183,5 +218,9 @@ module.exports = {
     updateTeacherAttendance,
     getTeacherAttendanceReport,
     getMyAttendanceHistory,
-    getAdminAttendanceReport
+    getAdminAttendanceReport,
+    getAdminAttendanceRecords,
+    getAdminAttendanceById,
+    updateAdminAttendance,
+    deleteAdminAttendance
 };

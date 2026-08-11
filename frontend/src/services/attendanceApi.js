@@ -113,3 +113,30 @@ export const getAdminAttendanceReport = async (params = {}) => {
 
     return response.data;
 };
+
+export const getAdminAttendanceRecords = async (params = {}) => {
+    const { page = 1, limit = 10, ...otherParams } = params;
+    const response = await apiClient.get('/attendance/admin/records', {
+        params: {
+            page,
+            limit,
+            ...otherParams
+        },
+    });
+    return response.data;
+};
+
+export const getAdminAttendanceById = async (id) => {
+    const response = await apiClient.get(`/attendance/admin/records/${id}`);
+    return response.data?.data;
+};
+
+export const updateAdminAttendance = async (id, status) => {
+    const response = await apiClient.patch(`/attendance/admin/records/${id}`, { status });
+    return response.data;
+};
+
+export const deleteAdminAttendance = async (id) => {
+    const response = await apiClient.delete(`/attendance/admin/records/${id}`);
+    return response.data;
+};

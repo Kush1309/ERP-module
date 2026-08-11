@@ -767,6 +767,157 @@ const getAdminAttendanceReport = async (queryOpts = {}) => {
     };
 };
 
+const getAdminAttendanceRecords = async (queryOpts = {}) => {
+    const { startDate, endDate, date, status, search } = queryOpts;
+    const page = parseInt(queryOpts.page, 10) || 1;
+    const limit = parseInt(queryOpts.limit, 10) || 10;
+
+    const classFilter = queryOpts.class ? String(queryOpts.class) : undefined;
+    const sectionFilter = queryOpts.section ? String(queryOpts.section) : undefined;
+
+    const studentQuery = {};
+    if (classFilter) studentQuery.class = classFilter;
+    if (sectionFilter) studentQuery.section = sectionFilter;
+
+    if (search) {
+        const searchRegex = new RegExp(String(search).replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&'), 'i');
+        studentQuery.$or = [
+            { firstName: searchRegex },
+            { lastName: searchRegex },
+            { rollNumber: searchRegex },
+            { studentId: searchRegex }
+        ];
+    }
+
+    let targetStudentIds = null;
+    if (Object.keys(studentQuery).length > 0) {
+        const students = await Student.find(studentQuery, '_id').lean();
+        targetStudentIds = students.map(s => s._id);
+    }
+
+    const attFilter = {};
+    if (targetStudentIds !== null) {
+        if (targetStudentIds.length === 0) {
+            return { records: [], pagination: { total: 0, page: 1, limit, totalPages: 0 } };
+        }
+        attFilter.student = { $in: targetStudentIds };
+    }
+
+    if (date) {
+        const d = new Date(date);
+        if (!isNaN(d)) {
+            d.setUTCHours(0, 0, 0, 0);
+            attFilter.date = d;
+        }
+    } else if (startDate || endDate) {
+        attFilter.date = {};
+        if (startDate) {
+            const startD = new Date(startDate);
+            if (isNaN(startD)) throw new AppError('Invalid start date', 400);
+            startD.setUTCHours(0, 0, 0, 0);
+            attFilter.date.$gte = startD;
+        }
+        if (endDate) {
+            const endD = new Date(endDate);
+            if (isNaN(endD)) throw new AppError('Invalid end date', 400);
+            endD.setUTCHours(23, 59, 59, 999);
+            attFilter.date.$lte = endD;
+        }
+        if (attFilter.date.$gte && attFilter.date.$lte && attFilter.date.$gte > attFilter.date.$lte) {
+            throw new AppError('Start date cannot be after end date', 400);
+        }
+    }
+
+    if (status) {
+        if (status !== 'PRESENT' && status !== 'ABSENT') {
+            throw new AppError('Invalid status filter', 400);
+        }
+        attFilter.status = status;
+    }
+
+    const safePage = Math.max(page, 1);
+    let safeLimit = limit;
+    if (safeLimit < 1) safeLimit = 10;
+    if (safeLimit > 100) safeLimit = 100;
+    const skip = (safePage - 1) * safeLimit;
+
+    const [records, total] = await Promise.all([
+        Attendance.find(attFilter)
+            .populate('student', 'firstName lastName studentId class section rollNumber')
+            .skip(skip)
+            .limit(safeLimit)
+            .sort({ date: -1 })
+            .lean(),
+        Attendance.countDocuments(attFilter)
+    ]);
+
+    const formattedRecords = records.map(r => ({
+        _id: r._id,
+        date: r.date,
+        status: r.status,
+        student: {
+            _id: r.student._id,
+            studentId: r.student.studentId,
+            firstName: r.student.firstName,
+            lastName: r.student.lastName,
+            rollNumber: r.student.rollNumber,
+            class: r.student.class,
+            section: r.student.section
+        }
+    }));
+
+    return {
+        records: formattedRecords,
+        pagination: {
+            total,
+            page: safePage,
+            limit: safeLimit,
+            totalPages: Math.ceil(total / safeLimit)
+        }
+    };
+};
+
+const getAdminAttendanceById = async (id) => {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+        throw new AppError('Invalid attendance ID', 400);
+    }
+    const attendance = await Attendance.findById(id)
+        .populate('student', 'firstName lastName studentId class section rollNumber')
+        .lean();
+    if (!attendance) {
+        throw new AppError('Attendance record not found', 404);
+    }
+    return attendance;
+};
+
+const updateAdminAttendance = async (id, status) => {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+        throw new AppError('Invalid attendance ID', 400);
+    }
+    if (status !== 'PRESENT' && status !== 'ABSENT') {
+        throw new AppError('Invalid status', 400);
+    }
+    const attendance = await Attendance.findById(id);
+    if (!attendance) {
+        throw new AppError('Attendance record not found', 404);
+    }
+    attendance.status = status;
+    await attendance.save();
+    return attendance;
+};
+
+const deleteAdminAttendance = async (id) => {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+        throw new AppError('Invalid attendance ID', 400);
+    }
+    const attendance = await Attendance.findById(id);
+    if (!attendance) {
+        throw new AppError('Attendance record not found', 404);
+    }
+    await Attendance.deleteOne({ _id: id });
+    return { success: true };
+};
+
 module.exports = {
     createAttendance,
     getAttendances,
@@ -779,5 +930,9 @@ module.exports = {
     updateTeacherAttendance,
     getTeacherAttendanceReport,
     getMyAttendanceHistory,
-    getAdminAttendanceReport
+    getAdminAttendanceReport,
+    getAdminAttendanceRecords,
+    getAdminAttendanceById,
+    updateAdminAttendance,
+    deleteAdminAttendance
 };

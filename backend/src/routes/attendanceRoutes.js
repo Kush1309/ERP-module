@@ -11,7 +11,11 @@ const {
     updateTeacherAttendance,
     getTeacherAttendanceReport,
     getMyAttendanceHistory,
-    getAdminAttendanceReport
+    getAdminAttendanceReport,
+    getAdminAttendanceRecords,
+    getAdminAttendanceById,
+    updateAdminAttendance,
+    deleteAdminAttendance
 } = require('../controllers/attendanceController');
 const { authenticateUser, authorizeRoles } = require('../middlewares/auth');
 const { ROLES } = require('../constants/roles');
@@ -103,6 +107,34 @@ router.get(
     authenticateUser,
     authorizeRoles(ROLES.ADMIN),
     getAdminAttendanceReport
+);
+
+router.get(
+    '/admin/records',
+    authenticateUser,
+    authorizeRoles(ROLES.ADMIN),
+    getAdminAttendanceRecords
+);
+
+router.get(
+    '/admin/records/:id',
+    authenticateUser,
+    authorizeRoles(ROLES.ADMIN),
+    getAdminAttendanceById
+);
+
+router.patch(
+    '/admin/records/:id',
+    authenticateUser,
+    authorizeRoles(ROLES.ADMIN),
+    updateAdminAttendance
+);
+
+router.delete(
+    '/admin/records/:id',
+    authenticateUser,
+    authorizeRoles(ROLES.ADMIN),
+    deleteAdminAttendance
 );
 
 router.patch(
