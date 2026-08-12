@@ -121,7 +121,8 @@ const getStudentsList = async (queryOpts) => {
     if (status) query.status = status;
 
     if (search) {
-        const searchRegex = { $regex: search, $options: 'i' };
+        const safeSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const searchRegex = { $regex: safeSearch, $options: 'i' };
         query.$or = [
             { firstName: searchRegex },
             { lastName: searchRegex },
