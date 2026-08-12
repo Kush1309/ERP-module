@@ -1,0 +1,17 @@
+Error: Cannot find module '../middlewares/authMiddleware'
+Require stack:
+- C:\Users\Kushagra Saxena\Desktop\school-erp\backend\src\routes\subjectRoutes.js
+- C:\Users\Kushagra Saxena\Desktop\school-erp\backend\src\routes\index.js
+- C:\Users\Kushagra Saxena\Desktop\school-erp\backend\src\app.js
+- C:\Users\Kushagra Saxena\Desktop\school-erp\backend\src\server.js
+- C:\Users\Kushagra Saxena\Desktop\school-erp\backend\[eval]
+    at Function._resolveFilename (node:internal/modules/cjs/loader:1383:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1025:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1030:22)
+    at Function._load (node:internal/modules/cjs/loader:1192:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Module.require (node:internal/modules/cjs/loader:1463:12)
+    at require (node:internal/modules/helpers:147:16)
+    at Object.<anonymous> (C:\Users\Kushagra Saxena\Desktop\school-erp\backend\src\routes\subjectRoutes.js:4:46)
+    at Module._compile (node:internal/modules/cjs/loader:1706:14)

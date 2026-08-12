@@ -10,6 +10,7 @@ import AdminDashboardPage from './pages/AdminDashboardPage';
 import TeacherDashboardPage from './pages/TeacherDashboardPage';
 import StudentDashboardPage from './pages/student/StudentDashboardPage';
 import StudentAttendancePage from './pages/student/StudentAttendancePage';
+import StudentResultsPage from './pages/student/StudentResultsPage';
 import ParentDashboardPage from './pages/ParentDashboardPage';
 import StudentManagementPage from './pages/admin/StudentManagementPage';
 import AddStudentPage from './pages/admin/AddStudentPage';
@@ -26,6 +27,11 @@ import EditTeacherPage from './pages/admin/EditTeacherPage';
 import TeacherAttendancePage from './pages/teacher/TeacherAttendancePage';
 import TeacherAttendanceHistoryPage from './pages/teacher/TeacherAttendanceHistoryPage';
 import TeacherAttendanceReportPage from './pages/teacher/TeacherAttendanceReportPage';
+import ExaminationManagementPage from './pages/admin/ExaminationManagementPage';
+import ExaminationDetailsPage from './pages/admin/ExaminationDetailsPage';
+import SubjectManagementPage from './pages/admin/SubjectManagementPage';
+import TeacherExaminationPage from './pages/teacher/TeacherExaminationPage';
+import TeacherMarksEntryPage from './pages/teacher/TeacherMarksEntryPage';
 import { ROLES } from './constants/roles';
 
 function App() {
@@ -163,6 +169,33 @@ function App() {
         />
 
         <Route
+          path="/admin/examinations"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+              <ExaminationManagementPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/admin/examinations/:id"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+              <ExaminationDetailsPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/admin/subjects"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+              <SubjectManagementPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
           path="/teacher"
           element={
             <ProtectedRoute allowedRoles={[ROLES.TEACHER]}>
@@ -199,6 +232,24 @@ function App() {
         />
 
         <Route
+          path="/teacher/examinations"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.TEACHER]}>
+              <TeacherExaminationPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/teacher/examinations/:id/marks"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.TEACHER]}>
+              <TeacherMarksEntryPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
           path="/student/dashboard"
           element={
             <ProtectedRoute allowedRoles={[ROLES.STUDENT]}>
@@ -212,6 +263,15 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={[ROLES.STUDENT]}>
               <StudentAttendancePage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/student/results"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.STUDENT]}>
+              <StudentResultsPage />
             </ProtectedRoute>
           }
         />
