@@ -157,6 +157,232 @@ const bulkDeactivateStudents = asyncHandler(async (req, res) => {
     });
 });
 
+const importAdminStudents = asyncHandler(async (req, res) => {
+    const contentType = req.headers['content-type'] || '';
+    if (!contentType.includes('multipart/form-data')) {
+        throw new AppError('Invalid content type. Must be multipart/form-data.', 400);
+    }
+
+    const boundaryMatch = contentType.match(/boundary=(?:"([^"]+)"|([^;]+))/i);
+    if (!boundaryMatch) {
+        throw new AppError('Boundary not found in multipart/form-data content type.', 400);
+    }
+    const boundary = '--' + (boundaryMatch[1] || boundaryMatch[2]);
+
+    let buffer;
+    try {
+        buffer = await new Promise((resolve, reject) => {
+            let body = [];
+            let totalSize = 0;
+            const MAX_SIZE = 5 * 1024 * 1024; // 5MB limit
+            req.on('data', chunk => {
+                totalSize += chunk.length;
+                if (totalSize > MAX_SIZE) {
+                    reject(new AppError('File size exceeds the 5MB limit.', 400));
+                    return;
+                }
+                body.push(chunk);
+            });
+            req.on('end', () => resolve(Buffer.concat(body)));
+            req.on('error', err => reject(err));
+        });
+    } catch (err) {
+        throw new AppError(err.message || 'Error reading upload stream.', 400);
+    }
+
+    const strBuffer = buffer.toString('utf-8');
+    const parts = strBuffer.split(boundary);
+    let csvContent = null;
+
+    for (const part of parts) {
+        if (part.includes('filename="') && part.includes('name="file"')) {
+            const dataIndex = part.indexOf('\r\n\r\n');
+            if (dataIndex !== -1) {
+                const contentEnd = part.lastIndexOf('\r\n');
+                csvContent = part.substring(dataIndex + 4, contentEnd !== -1 && contentEnd > dataIndex + 4 ? contentEnd : part.length);
+                break;
+            }
+        }
+    }
+
+    if (!csvContent || csvContent.trim().length === 0) {
+        throw new AppError('No valid CSV file found in request. File part must be named "file".', 400);
+    }
+
+    const rows = [];
+    let currentRow = [];
+    let currentCell = '';
+    let inQuotes = false;
+
+    const csvStr = csvContent.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+    for (let i = 0; i < csvStr.length; i++) {
+        let c = csvStr[i];
+        if (inQuotes) {
+            if (c === '"') {
+                if (i + 1 < csvStr.length && csvStr[i + 1] === '"') {
+                    currentCell += '"';
+                    i++;
+                } else {
+                    inQuotes = false;
+                }
+            } else {
+                currentCell += c;
+            }
+        } else {
+            if (c === '"') {
+                inQuotes = true;
+            } else if (c === ',') {
+                currentRow.push(currentCell.trim());
+                currentCell = '';
+            } else if (c === '\n') {
+                currentRow.push(currentCell.trim());
+                if (currentRow.join('').trim().length > 0) {
+                    rows.push(currentRow);
+                }
+                currentRow = [];
+                currentCell = '';
+            } else {
+                currentCell += c;
+            }
+        }
+    }
+    if (currentCell || currentRow.length > 0) {
+        currentRow.push(currentCell.trim());
+        if (currentRow.join('').trim().length > 0) {
+            rows.push(currentRow);
+        }
+    }
+
+    if (rows.length < 2) {
+        throw new AppError('CSV must contain headers and at least one data row.', 400);
+    }
+
+    const rawHeaders = rows[0];
+    const dataRows = rows.slice(1);
+
+    const EXPECTED_HEADERS = ['FirstName', 'LastName', 'DateOfBirth', 'Gender', 'Class', 'Section', 'RollNumber', 'AdmissionNumber', 'AdmissionDate', 'Phone', 'Address', 'City', 'State', 'PostalCode'];
+
+    const headerMap = {};
+    rawHeaders.forEach((h, idx) => {
+        const cleanH = h.trim();
+        headerMap[cleanH] = idx;
+    });
+
+    const missingHeaders = EXPECTED_HEADERS.filter(eh => headerMap[eh] === undefined);
+    if (missingHeaders.length > 0) {
+        throw new AppError(`Missing required headers: ${missingHeaders.join(', ')}`, 400);
+    }
+
+    const studentDataArray = [];
+    const errors = [];
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    for (let i = 0; i < dataRows.length; i++) {
+        const row = dataRows[i];
+        const rowNum = i + 2;
+
+        const getValue = (header) => row[headerMap[header]] !== undefined ? row[headerMap[header]] : '';
+
+        const studentData = {
+            firstName: getValue('FirstName'),
+            lastName: getValue('LastName'),
+            dateOfBirth: getValue('DateOfBirth'),
+            gender: getValue('Gender').toUpperCase(),
+            class: getValue('Class'),
+            section: getValue('Section'),
+            rollNumber: getValue('RollNumber'),
+            admissionNumber: getValue('AdmissionNumber'),
+            admissionDate: getValue('AdmissionDate'),
+            phone: getValue('Phone'),
+            email: getValue('Email') ? getValue('Email').toLowerCase() : null,
+            address: getValue('Address'),
+            city: getValue('City'),
+            state: getValue('State'),
+            postalCode: getValue('PostalCode'),
+        };
+
+        let rowHasError = false;
+
+        for (const [key, val] of Object.entries(studentData)) {
+            if (val && typeof val === 'string' && val.startsWith('$')) {
+                errors.push({ row: rowNum, field: key, message: 'Invalid starting character "$".' });
+                rowHasError = true;
+            }
+        }
+
+        for (const reqField of EXPECTED_HEADERS) {
+            if (!studentData[reqField] && reqField !== 'Email') {
+                errors.push({ row: rowNum, field: reqField, message: `${reqField} is required.` });
+                rowHasError = true;
+            }
+        }
+
+        if (studentData.email && !emailRegex.test(studentData.email)) {
+            errors.push({ row: rowNum, field: 'Email', message: 'Invalid email format.' });
+            rowHasError = true;
+        }
+
+        if (studentData.gender && !['MALE', 'FEMALE', 'OTHER'].includes(studentData.gender)) {
+            errors.push({ row: rowNum, field: 'Gender', message: 'Gender must be MALE, FEMALE, or OTHER.' });
+            rowHasError = true;
+        }
+
+        if (studentData.dateOfBirth && isNaN(Date.parse(studentData.dateOfBirth))) {
+            errors.push({ row: rowNum, field: 'DateOfBirth', message: 'Invalid date format.' });
+            rowHasError = true;
+        }
+
+        if (studentData.admissionDate && isNaN(Date.parse(studentData.admissionDate))) {
+            errors.push({ row: rowNum, field: 'AdmissionDate', message: 'Invalid date format.' });
+            rowHasError = true;
+        }
+
+        if (!rowHasError) {
+            studentDataArray.push({ rowNum, data: studentData });
+        }
+    }
+
+    if (errors.length > 0) {
+        return res.status(400).json({
+            success: false,
+            message: 'CSV validation failed.',
+            data: {
+                totalRows: dataRows.length,
+                imported: 0,
+                failed: errors.length,
+                errors: errors.slice(0, 50)
+            }
+        });
+    }
+
+    const { imported, failed, serviceErrors } = await studentService.bulkImportStudents(studentDataArray, dataRows.length);
+
+    if (failed > 0) {
+        return res.status(400).json({
+            success: false,
+            message: 'Import failed due to data consistency errors.',
+            data: {
+                totalRows: dataRows.length,
+                imported: 0,
+                failed,
+                errors: serviceErrors
+            }
+        });
+    }
+
+    res.status(200).json({
+        success: true,
+        message: 'Students imported successfully.',
+        data: {
+            totalRows: dataRows.length,
+            imported,
+            failed: 0,
+            errors: []
+        }
+    });
+});
+
 module.exports = {
     createStudent,
     getStudents,
@@ -167,5 +393,6 @@ module.exports = {
     getCurrentStudent,
     exportAdminStudents,
     bulkActivateStudents,
-    bulkDeactivateStudents
+    bulkDeactivateStudents,
+    importAdminStudents
 };

@@ -58,3 +58,10 @@ export const exportAdminStudents = async (params = {}) => {
     });
     return response.data;
 };
+
+export const importStudents = async (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await apiClient.post('/students/admin/import', formData);
+    return response.data;
+};

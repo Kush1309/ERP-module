@@ -419,6 +419,125 @@ const bulkUpdateStudentStatus = async (studentIds, isActive) => {
     };
 };
 
+const bulkImportStudents = async (studentDataArray, totalRows) => {
+    const serviceErrors = [];
+
+    const admissionNumbers = new Set();
+    const emails = new Set();
+    let hasInternalDuplicates = false;
+
+    for (const item of studentDataArray) {
+        const { rowNum, data } = item;
+
+        if (admissionNumbers.has(data.admissionNumber)) {
+            serviceErrors.push({ row: rowNum, field: 'AdmissionNumber', message: 'Duplicate AdmissionNumber within CSV.' });
+            hasInternalDuplicates = true;
+        } else {
+            admissionNumbers.add(data.admissionNumber);
+        }
+
+        if (data.email) {
+            if (emails.has(data.email)) {
+                serviceErrors.push({ row: rowNum, field: 'Email', message: 'Duplicate Email within CSV.' });
+                hasInternalDuplicates = true;
+            } else {
+                emails.add(data.email);
+            }
+        }
+    }
+
+    if (hasInternalDuplicates) {
+        return { imported: 0, failed: serviceErrors.length, serviceErrors };
+    }
+
+    const existingAdmissions = await Student.find({ admissionNumber: { $in: Array.from(admissionNumbers) } }).select('admissionNumber').lean();
+    if (existingAdmissions.length > 0) {
+        const dupes = existingAdmissions.map(e => e.admissionNumber);
+        for (const item of studentDataArray) {
+            if (dupes.includes(item.data.admissionNumber)) {
+                serviceErrors.push({ row: item.rowNum, field: 'AdmissionNumber', message: `AdmissionNumber ${item.data.admissionNumber} already exists in database.` });
+            }
+        }
+    }
+
+    if (emails.size > 0) {
+        const existingEmails = await Student.find({ email: { $in: Array.from(emails) } }).select('email').lean();
+        if (existingEmails.length > 0) {
+            const dupes = existingEmails.map(e => e.email);
+            for (const item of studentDataArray) {
+                if (item.data.email && dupes.includes(item.data.email)) {
+                    serviceErrors.push({ row: item.rowNum, field: 'Email', message: `Email ${item.data.email} already exists in database.` });
+                }
+            }
+        }
+    }
+
+    if (serviceErrors.length > 0) {
+        return { imported: 0, failed: serviceErrors.length, serviceErrors };
+    }
+
+    let session;
+    let useFallback = false;
+
+    try {
+        session = await mongoose.startSession();
+        session.startTransaction();
+    } catch (error) {
+        useFallback = true;
+    }
+
+    try {
+        const usersToCreate = [];
+        const studentsToCreate = [];
+
+        for (const item of studentDataArray) {
+            const { data } = item;
+
+            // Generate credentials sequentially for safety if id generator does not support multi-doc mapping simultaneously
+            const loginId = await generateLoginId(ROLES.STUDENT);
+            const tempPassword = generateTempPassword();
+            const hashedPassword = await hashPassword(tempPassword);
+
+            const userDoc = new User({
+                loginId,
+                password: hashedPassword,
+                role: ROLES.STUDENT,
+                mustChangePassword: true,
+                isActive: true
+            });
+            usersToCreate.push(userDoc);
+
+            const studentDoc = new Student({
+                ...data,
+                user: userDoc._id
+            });
+            studentsToCreate.push(studentDoc);
+        }
+
+        if (!useFallback) {
+            await User.insertMany(usersToCreate, { session });
+            await Student.insertMany(studentsToCreate, { session });
+            await session.commitTransaction();
+        } else {
+            await User.insertMany(usersToCreate);
+            await Student.insertMany(studentsToCreate);
+        }
+
+    } catch (error) {
+        if (session && session.inTransaction()) {
+            await session.abortTransaction();
+        }
+        serviceErrors.push({ row: '-', field: 'Database', message: 'Internal transaction error occurred while creating records.' });
+        return { imported: 0, failed: 1, serviceErrors };
+    } finally {
+        if (session) {
+            session.endSession();
+        }
+    }
+
+    return { imported: totalRows, failed: 0, serviceErrors: [] };
+};
+
 module.exports = {
     createStudentAccount,
     generateTempPassword,
@@ -427,6 +546,7 @@ module.exports = {
     updateStudentById,
     updateStudentStatus,
     bulkUpdateStudentStatus,
+    bulkImportStudents,
     getCurrentStudent,
     exportAdminStudents
 };

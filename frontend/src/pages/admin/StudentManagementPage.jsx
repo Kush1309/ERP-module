@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import Button from '../../components/Button';
 import Card from '../../components/Card';
-import { getStudents, exportAdminStudents, bulkUpdateStudentStatus } from '../../services/studentApi';
+import { getStudents, exportAdminStudents, bulkUpdateStudentStatus, importStudents } from '../../services/studentApi';
 
 const DEFAULT_LIMIT = 10;
 
@@ -44,6 +44,13 @@ function StudentManagementPage() {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [confirmActionType, setConfirmActionType] = useState(null);
   const [bulkUpdating, setBulkUpdating] = useState(false);
+
+  // Import states
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importFile, setImportFile] = useState(null);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState(null);
+  const fileInputRef = useRef(null);
 
   // Prevent double fetches on filter change
   const filterParamsRef = useRef({ search: '', ...filters });
@@ -136,6 +143,35 @@ function StudentManagementPage() {
     }
   };
 
+  const handleFileSelect = (e) => {
+    if (e.target.files && e.target.files[0]) {
+      setImportFile(e.target.files[0]);
+      setImportResult(null);
+    }
+  };
+
+  const handleImport = async () => {
+    if (!importFile) return;
+    setImporting(true);
+    setImportResult(null);
+
+    try {
+      const response = await importStudents(importFile);
+      setImportResult({ success: true, message: response.message, data: response.data });
+      setImportFile(null);
+      handleRetry();
+    } catch (err) {
+      if (err.response?.data) {
+        setImportResult({ success: false, ...err.response.data });
+      } else {
+        setImportResult({ success: false, message: 'Failed to import students. Please ensure the CSV is valid.' });
+      }
+    } finally {
+      setImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
   const onExportClick = async () => {
     setIsExporting(true);
     setError('');
@@ -185,9 +221,18 @@ function StudentManagementPage() {
           <Button
             type="button"
             variant="secondary"
+            onClick={() => setShowImportModal(true)}
+            disabled={isExporting || loading || importing}
+            className="whitespace-nowrap"
+          >
+            Import CSV
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
             onClick={onExportClick}
             disabled={isExporting || loading}
-            className="min-w-[120px] whitespace-nowrap"
+            className="whitespace-nowrap"
           >
             {isExporting ? 'Exporting...' : 'Export CSV'}
           </Button>
@@ -440,6 +485,61 @@ function StudentManagementPage() {
               </Button>
               <Button type="button" onClick={handleBulkAction} disabled={bulkUpdating}>
                 {bulkUpdating ? 'Processing...' : 'Confirm'}
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {showImportModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-900/50">
+          <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 shadow-xl relative z-10 pointer-events-auto">
+            <h3 className="mb-4 text-lg font-semibold text-ink-900">Import Students</h3>
+            <p className="mb-4 text-sm text-ink-600">
+              Please upload a CSV file. Required headers: <br />
+              <span className="font-mono text-xs">FirstName, LastName, DateOfBirth, Gender, Class, Section, RollNumber, AdmissionNumber, AdmissionDate, Phone, Address, City, State, PostalCode</span>
+            </p>
+
+            <div className="mb-4">
+              <input
+                type="file"
+                accept=".csv"
+                ref={fileInputRef}
+                onChange={handleFileSelect}
+                className="block w-full text-sm text-ink-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100"
+              />
+            </div>
+
+            {importResult && (
+              <div className={`mb-4 p-4 rounded-md ${importResult.success ? 'bg-emerald-50 border border-emerald-200' : 'bg-rose-50 border border-rose-200'}`}>
+                <p className={`text-sm font-medium ${importResult.success ? 'text-emerald-800' : 'text-rose-800'}`}>
+                  {importResult.message}
+                </p>
+                {importResult.data && (
+                  <p className="text-xs mt-1 text-ink-700">
+                    Rows processed: {importResult.data.totalRows} | Imported: {importResult.data.imported} | Failed: {importResult.data.failed}
+                  </p>
+                )}
+                {importResult.data?.errors && importResult.data.errors.length > 0 && (
+                  <div className="mt-3 max-h-40 overflow-y-auto border border-rose-200 rounded p-2 bg-white">
+                    <ul className="text-xs text-rose-700 space-y-1 list-disc list-inside">
+                      {importResult.data.errors.map((err, i) => (
+                        <li key={i}>
+                          Row {err.row} ({err.field}): {err.message}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="flex justify-end gap-3 border-t border-ink-100 pt-4 mt-2 pointer-events-auto">
+              <Button type="button" variant="secondary" onClick={() => { setShowImportModal(false); setImportFile(null); setImportResult(null); }} disabled={importing}>
+                Close
+              </Button>
+              <Button type="button" onClick={handleImport} disabled={importing || !importFile}>
+                {importing ? 'Importing...' : 'Upload & Import'}
               </Button>
             </div>
           </Card>
