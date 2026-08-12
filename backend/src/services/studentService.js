@@ -251,6 +251,74 @@ const updateStudentStatus = async (id, isActive) => {
     return { student, user: { loginId: user.loginId, isActive: user.isActive } };
 };
 
+const exportAdminStudents = async (queryOpts) => {
+    let { search, class: className, section, status } = queryOpts;
+
+    // Sanitize string conversions to prevent NoSQL injection
+    if (className) className = String(className);
+    if (section) section = String(section);
+    if (status) status = String(status);
+    if (search) search = String(search);
+
+    const query = {};
+
+    if (className) query.class = className;
+    if (section) query.section = section;
+    if (status && (status === 'ACTIVE' || status === 'INACTIVE')) {
+        query.status = status;
+    }
+
+    if (search) {
+        const safeSearch = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const searchRegex = { $regex: safeSearch, $options: 'i' };
+        query.$or = [
+            { firstName: searchRegex },
+            { lastName: searchRegex },
+            { studentId: searchRegex },
+            { admissionNumber: searchRegex }
+        ];
+    }
+
+    const students = await Student.find(query)
+        .select('studentId firstName lastName rollNumber class section status email')
+        .sort({ studentId: 1 })
+        .lean();
+
+    const headers = ['Student ID', 'First Name', 'Last Name', 'Roll Number', 'Class', 'Section', 'Status', 'Email'];
+
+    const escapeCsvValue = (val) => {
+        if (val === null || val === undefined) return '';
+        let strVal = String(val);
+        // Protect against spreadsheet formula injection
+        if (/^[=+\-@]/.test(strVal)) {
+            strVal = "'" + strVal;
+        }
+        // Escape quotes and wrap in quotes if there is a comma, quote or newline
+        if (strVal.includes(',') || strVal.includes('"') || strVal.includes('\n')) {
+            strVal = `"${strVal.replace(/"/g, '""')}"`;
+        }
+        return strVal;
+    };
+
+    const csvRows = [headers.join(',')];
+
+    for (const s of students) {
+        const row = [
+            escapeCsvValue(s.studentId),
+            escapeCsvValue(s.firstName),
+            escapeCsvValue(s.lastName),
+            escapeCsvValue(s.rollNumber),
+            escapeCsvValue(s.class),
+            escapeCsvValue(s.section),
+            escapeCsvValue(s.status),
+            escapeCsvValue(s.email)
+        ];
+        csvRows.push(row.join(','));
+    }
+
+    return csvRows.join('\n');
+};
+
 const getCurrentStudent = async (userId) => {
     // Only return safe profile fields
     const student = await Student.findOne({ user: userId })
@@ -271,5 +339,6 @@ module.exports = {
     getStudentById,
     updateStudentById,
     updateStudentStatus,
-    getCurrentStudent
+    getCurrentStudent,
+    exportAdminStudents
 };

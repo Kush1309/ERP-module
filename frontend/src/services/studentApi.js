@@ -43,3 +43,12 @@ export const getCurrentStudent = async () => {
     const response = await apiClient.get('/students/me');
     return response.data?.data;
 };
+
+export const exportAdminStudents = async (params = {}) => {
+    const { search, class: className, section, status } = params;
+    const response = await apiClient.get('/students/admin/export', {
+        params: { search, class: className, section, status },
+        responseType: 'blob'
+    });
+    return response.data;
+};

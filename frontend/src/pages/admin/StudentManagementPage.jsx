@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import Button from '../../components/Button';
 import Card from '../../components/Card';
-import { getStudents } from '../../services/studentApi';
+import { getStudents, exportAdminStudents } from '../../services/studentApi';
 
 const DEFAULT_LIMIT = 10;
 
@@ -36,6 +36,7 @@ function StudentManagementPage() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [isExporting, setIsExporting] = useState(false);
 
   // Prevent double fetches on filter change
   const filterParamsRef = useRef({ search: '', ...filters });
@@ -99,6 +100,32 @@ function StudentManagementPage() {
     setPage(1);
   };
 
+  const onExportClick = async () => {
+    setIsExporting(true);
+    setError('');
+    try {
+      const csvBlob = await exportAdminStudents({
+        search: debouncedSearch,
+        class: filters.class,
+        section: filters.section,
+        status: filters.status,
+      });
+
+      const url = window.URL.createObjectURL(new Blob([csvBlob]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'students.csv');
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err?.response?.data?.message || 'Failed to export students. Please try again.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const formatStatus = (status) => {
     if (!status) return 'Unknown';
     return status.toLowerCase().split('_').map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(' ');
@@ -118,11 +145,22 @@ function StudentManagementPage() {
           <h1 className="mt-2 font-display text-3xl font-semibold text-ink-900">Student Management</h1>
           <p className="mt-2 text-sm text-ink-600">Manage student profiles and account status.</p>
         </div>
-        <Link to="/admin/students/new">
-          <Button type="button" variant="secondary" className="min-w-[150px] whitespace-nowrap">
-            + Add Student
+        <div className="flex items-center gap-3">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={onExportClick}
+            disabled={isExporting || loading}
+            className="min-w-[120px] whitespace-nowrap"
+          >
+            {isExporting ? 'Exporting...' : 'Export CSV'}
           </Button>
-        </Link>
+          <Link to="/admin/students/new">
+            <Button type="button" variant="secondary" className="min-w-[150px] whitespace-nowrap">
+              + Add Student
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Filters Section */}

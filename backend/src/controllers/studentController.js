@@ -90,6 +90,21 @@ const getCurrentStudent = asyncHandler(async (req, res) => {
     });
 });
 
+const exportAdminStudents = asyncHandler(async (req, res) => {
+    // Explicitly destructure only allowed filters from query
+    const { search, status } = req.query;
+    const classFilter = req.query.class;
+    const sectionFilter = req.query.section;
+
+    const csvData = await studentService.exportAdminStudents({
+        search, status, class: classFilter, section: sectionFilter
+    });
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="students.csv"');
+    res.status(200).send(csvData);
+});
+
 module.exports = {
     createStudent,
     getStudents,
@@ -97,5 +112,6 @@ module.exports = {
     updateStudent,
     activateStudentAccount,
     deactivateStudentAccount,
-    getCurrentStudent
+    getCurrentStudent,
+    exportAdminStudents
 };
