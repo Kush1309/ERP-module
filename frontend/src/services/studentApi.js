@@ -39,6 +39,12 @@ export const deactivateStudent = async (id) => {
     return response.data;
 };
 
+export const bulkUpdateStudentStatus = async (studentIds, status) => {
+    const endpoint = status === 'ACTIVE' ? '/students/bulk/activate' : '/students/bulk/deactivate';
+    const response = await apiClient.patch(endpoint, { studentIds });
+    return response.data;
+};
+
 export const getCurrentStudent = async () => {
     const response = await apiClient.get('/students/me');
     return response.data?.data;

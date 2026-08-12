@@ -105,6 +105,58 @@ const exportAdminStudents = asyncHandler(async (req, res) => {
     res.status(200).send(csvData);
 });
 
+const bulkActivateStudents = asyncHandler(async (req, res) => {
+    const { studentIds } = req.body;
+
+    if (!studentIds || !Array.isArray(studentIds) || studentIds.length === 0) {
+        throw new AppError('studentIds must be a non-empty array', 400);
+    }
+
+    const validIds = studentIds.filter(id => id && typeof id === 'string');
+    if (validIds.length !== studentIds.length) {
+        throw new AppError('Invalid student ID array format provided. IDs must be valid strings.', 400);
+    }
+
+    const { requestedCount, updatedCount, alreadyInStateCount, failedCount } = await studentService.bulkUpdateStudentStatus(validIds, true);
+
+    res.status(200).json({
+        success: true,
+        message: 'Bulk activation completed successfully',
+        data: {
+            requestedCount,
+            updatedCount,
+            alreadyInStateCount,
+            failedCount
+        }
+    });
+});
+
+const bulkDeactivateStudents = asyncHandler(async (req, res) => {
+    const { studentIds } = req.body;
+
+    if (!studentIds || !Array.isArray(studentIds) || studentIds.length === 0) {
+        throw new AppError('studentIds must be a non-empty array', 400);
+    }
+
+    const validIds = studentIds.filter(id => id && typeof id === 'string');
+    if (validIds.length !== studentIds.length) {
+        throw new AppError('Invalid student ID array format provided. IDs must be valid strings.', 400);
+    }
+
+    const { requestedCount, updatedCount, alreadyInStateCount, failedCount } = await studentService.bulkUpdateStudentStatus(validIds, false);
+
+    res.status(200).json({
+        success: true,
+        message: 'Bulk deactivation completed successfully',
+        data: {
+            requestedCount,
+            updatedCount,
+            alreadyInStateCount,
+            failedCount
+        }
+    });
+});
+
 module.exports = {
     createStudent,
     getStudents,
@@ -113,5 +165,7 @@ module.exports = {
     activateStudentAccount,
     deactivateStudentAccount,
     getCurrentStudent,
-    exportAdminStudents
+    exportAdminStudents,
+    bulkActivateStudents,
+    bulkDeactivateStudents
 };

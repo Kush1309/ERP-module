@@ -1,5 +1,5 @@
 const express = require('express');
-const { createStudent, getStudents, getStudentById, updateStudent, activateStudentAccount, deactivateStudentAccount, getCurrentStudent, exportAdminStudents } = require('../controllers/studentController');
+const { createStudent, getStudents, getStudentById, updateStudent, activateStudentAccount, deactivateStudentAccount, getCurrentStudent, exportAdminStudents, bulkActivateStudents, bulkDeactivateStudents } = require('../controllers/studentController');
 const { authenticateUser, authorizeRoles } = require('../middlewares/auth');
 const { ROLES } = require('../constants/roles');
 
@@ -8,6 +8,8 @@ const router = express.Router();
 router.post('/', authenticateUser, authorizeRoles(ROLES.ADMIN), createStudent);
 router.get('/', authenticateUser, authorizeRoles(ROLES.ADMIN), getStudents);
 router.get('/admin/export', authenticateUser, authorizeRoles(ROLES.ADMIN), exportAdminStudents);
+router.patch('/bulk/activate', authenticateUser, authorizeRoles(ROLES.ADMIN), bulkActivateStudents);
+router.patch('/bulk/deactivate', authenticateUser, authorizeRoles(ROLES.ADMIN), bulkDeactivateStudents);
 router.get('/me', authenticateUser, authorizeRoles(ROLES.STUDENT), getCurrentStudent);
 router.get('/:id', authenticateUser, authorizeRoles(ROLES.ADMIN), getStudentById);
 router.put('/:id', authenticateUser, authorizeRoles(ROLES.ADMIN), updateStudent);

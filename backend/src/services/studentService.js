@@ -332,6 +332,93 @@ const getCurrentStudent = async (userId) => {
     return student;
 };
 
+const bulkUpdateStudentStatus = async (studentIds, isActive) => {
+    const uniqueIds = [...new Set(studentIds)];
+
+    const validObjectIds = uniqueIds.filter(id => mongoose.Types.ObjectId.isValid(id));
+    const validStringIds = uniqueIds.filter(id => typeof id === 'string' && id.trim() !== '');
+
+    if (validObjectIds.length === 0 && validStringIds.length === 0) {
+        return { requestedCount: uniqueIds.length, updatedCount: 0, alreadyInStateCount: 0, failedCount: uniqueIds.length };
+    }
+
+    const query = { $or: [{ _id: { $in: validObjectIds } }, { studentId: { $in: validStringIds } }] };
+
+    const students = await Student.find(query).lean();
+
+    const failedCount = uniqueIds.length - students.length;
+    const targetStatus = isActive ? 'ACTIVE' : 'INACTIVE';
+
+    const studentsToUpdate = students.filter(s => s.status !== targetStatus);
+    const alreadyInStateCount = students.length - studentsToUpdate.length;
+    const updatedCount = studentsToUpdate.length;
+
+    if (updatedCount > 0) {
+        const studentIdsToUpdate = studentsToUpdate.map(s => s._id);
+        const userIdsToUpdate = studentsToUpdate.map(s => s.user);
+
+        let session;
+        let useFallback = false;
+
+        try {
+            session = await mongoose.startSession();
+            session.startTransaction();
+        } catch (error) {
+            useFallback = true;
+        }
+
+        if (!useFallback) {
+            try {
+                await Student.updateMany(
+                    { _id: { $in: studentIdsToUpdate } },
+                    { $set: { status: targetStatus } },
+                    { session }
+                );
+
+                await User.updateMany(
+                    { _id: { $in: userIdsToUpdate } },
+                    { $set: { isActive: isActive } },
+                    { session }
+                );
+
+                await session.commitTransaction();
+            } catch (error) {
+                if (session.inTransaction()) {
+                    await session.abortTransaction();
+                }
+                if (error.codeName === 'IllegalOperation' || (error.message && error.message.includes('replica set'))) {
+                    useFallback = true;
+                } else {
+                    throw error;
+                }
+            } finally {
+                if (session) {
+                    session.endSession();
+                }
+            }
+        }
+
+        if (useFallback) {
+            await Student.updateMany(
+                { _id: { $in: studentIdsToUpdate } },
+                { $set: { status: targetStatus } }
+            );
+
+            await User.updateMany(
+                { _id: { $in: userIdsToUpdate } },
+                { $set: { isActive: isActive } }
+            );
+        }
+    }
+
+    return {
+        requestedCount: uniqueIds.length,
+        updatedCount,
+        alreadyInStateCount,
+        failedCount
+    };
+};
+
 module.exports = {
     createStudentAccount,
     generateTempPassword,
@@ -339,6 +426,7 @@ module.exports = {
     getStudentById,
     updateStudentById,
     updateStudentStatus,
+    bulkUpdateStudentStatus,
     getCurrentStudent,
     exportAdminStudents
 };

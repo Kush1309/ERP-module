@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import Button from '../../components/Button';
 import Card from '../../components/Card';
-import { getStudents, exportAdminStudents } from '../../services/studentApi';
+import { getStudents, exportAdminStudents, bulkUpdateStudentStatus } from '../../services/studentApi';
 
 const DEFAULT_LIMIT = 10;
 
@@ -36,7 +36,14 @@ function StudentManagementPage() {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const [isExporting, setIsExporting] = useState(false);
+
+  // Bulk operation states
+  const [selectedStudents, setSelectedStudents] = useState([]);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [confirmActionType, setConfirmActionType] = useState(null);
+  const [bulkUpdating, setBulkUpdating] = useState(false);
 
   // Prevent double fetches on filter change
   const filterParamsRef = useRef({ search: '', ...filters });
@@ -79,6 +86,7 @@ function StudentManagementPage() {
       targetPage = 1;
       if (page !== 1) setPage(1);
       filterParamsRef.current = newFilterParams;
+      setSelectedStudents([]);
     }
 
     loadStudents(targetPage, debouncedSearch, filters);
@@ -98,6 +106,34 @@ function StudentManagementPage() {
     setSearchTerm('');
     setFilters({ class: '', section: '', status: '' });
     setPage(1);
+    setSelectedStudents([]);
+    setSuccessMessage('');
+  };
+
+  const handleBulkAction = async () => {
+    setBulkUpdating(true);
+    setError('');
+    setSuccessMessage('');
+    const status = confirmActionType === 'activate' ? 'ACTIVE' : 'INACTIVE';
+    try {
+      const response = await bulkUpdateStudentStatus(selectedStudents, status);
+      const { requestedCount, updatedCount, alreadyInStateCount, failedCount } = response.data;
+
+      setSelectedStudents([]);
+      setShowConfirmModal(false);
+      handleRetry();
+
+      let msg = `${updatedCount} student(s) updated successfully.`;
+      if (alreadyInStateCount > 0) msg += ` ${alreadyInStateCount} already in requested state.`;
+      if (failedCount > 0) msg += ` ${failedCount} could not be updated.`;
+      setSuccessMessage(msg);
+
+    } catch (err) {
+      setError(err?.response?.data?.message || 'Failed to perform bulk operation.');
+      setShowConfirmModal(false);
+    } finally {
+      setBulkUpdating(false);
+    }
   };
 
   const onExportClick = async () => {
@@ -226,6 +262,45 @@ function StudentManagementPage() {
         </div>
       </Card>
 
+      {successMessage && (
+        <Card className="mb-6 border-emerald-200 bg-emerald-50 p-4">
+          <p className="text-sm font-medium text-emerald-800">{successMessage}</p>
+        </Card>
+      )}
+
+      {selectedStudents.length > 0 && (
+        <Card className="mb-6 p-4 flex flex-col sm:flex-row items-center justify-between gap-4 border-brand-200 bg-brand-50">
+          <div className="text-sm font-medium text-brand-900">
+            {selectedStudents.length} student{selectedStudents.length > 1 ? 's' : ''} selected
+          </div>
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            <Button
+              type="button"
+              onClick={() => {
+                setConfirmActionType('activate');
+                setShowConfirmModal(true);
+              }}
+              disabled={bulkUpdating || loading}
+              className="w-full sm:w-auto whitespace-nowrap"
+            >
+              Bulk Activate
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                setConfirmActionType('deactivate');
+                setShowConfirmModal(true);
+              }}
+              disabled={bulkUpdating || loading}
+              className="w-full sm:w-auto whitespace-nowrap"
+            >
+              Bulk Deactivate
+            </Button>
+          </div>
+        </Card>
+      )}
+
       <Card className="overflow-hidden">
         {loading ? (
           <div className="flex min-h-[220px] items-center justify-center">
@@ -264,6 +339,29 @@ function StudentManagementPage() {
               <table className="min-w-full divide-y divide-ink-200">
                 <thead className="bg-ink-50">
                   <tr>
+                    <th className="px-4 py-3 text-left w-12">
+                      <input
+                        type="checkbox"
+                        title="Select all"
+                        className="h-4 w-4 rounded border-ink-300 text-brand-600 focus:ring-brand-500 cursor-pointer"
+                        checked={students.length > 0 && students.every(s => selectedStudents.includes(s._id || s.studentId))}
+                        ref={(input) => {
+                          if (input) {
+                            const allSelected = students.length > 0 && students.every(s => selectedStudents.includes(s._id || s.studentId));
+                            const someSelected = students.some(s => selectedStudents.includes(s._id || s.studentId));
+                            input.indeterminate = !allSelected && someSelected;
+                          }
+                        }}
+                        onChange={(e) => {
+                          const displayedIds = students.map(s => s._id || s.studentId).filter(Boolean);
+                          if (e.target.checked) {
+                            setSelectedStudents(prev => [...new Set([...prev, ...displayedIds])]);
+                          } else {
+                            setSelectedStudents(prev => prev.filter(id => !displayedIds.includes(id)));
+                          }
+                        }}
+                      />
+                    </th>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-ink-600">Student ID</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-ink-600">Student Name</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-ink-600">Class</th>
@@ -276,6 +374,23 @@ function StudentManagementPage() {
                 <tbody className="divide-y divide-ink-200 bg-white">
                   {students.map((student) => (
                     <tr key={student._id || student.studentId} className="hover:bg-ink-50/60">
+                      <td className="px-4 py-3 text-sm">
+                        <input
+                          type="checkbox"
+                          title="Select student"
+                          className="h-4 w-4 rounded border-ink-300 text-brand-600 focus:ring-brand-500 cursor-pointer"
+                          checked={selectedStudents.includes(student._id || student.studentId)}
+                          onChange={(e) => {
+                            const id = student._id || student.studentId;
+                            if (!id) return;
+                            if (e.target.checked) {
+                              setSelectedStudents(prev => [...prev, id]);
+                            } else {
+                              setSelectedStudents(prev => prev.filter(sid => sid !== id));
+                            }
+                          }}
+                        />
+                      </td>
                       <td className="px-4 py-3 text-sm font-medium text-ink-900">{student.studentId}</td>
                       <td className="px-4 py-3 text-sm text-ink-900">{student.firstName} {student.lastName}</td>
                       <td className="px-4 py-3 text-sm text-ink-700">{student.class}</td>
@@ -311,6 +426,25 @@ function StudentManagementPage() {
           </>
         )}
       </Card>
+
+      {showConfirmModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-900/50">
+          <Card className="w-full max-w-sm p-6 shadow-xl relative z-10 pointer-events-auto">
+            <h3 className="mb-4 text-lg font-semibold text-ink-900">Confirm Bulk Action</h3>
+            <p className="mb-6 text-sm text-ink-600">
+              Are you sure you want to {confirmActionType} {selectedStudents.length} student{selectedStudents.length > 1 ? 's' : ''}?
+            </p>
+            <div className="flex justify-end gap-3 pointer-events-auto">
+              <Button type="button" variant="secondary" onClick={() => setShowConfirmModal(false)} disabled={bulkUpdating}>
+                Cancel
+              </Button>
+              <Button type="button" onClick={handleBulkAction} disabled={bulkUpdating}>
+                {bulkUpdating ? 'Processing...' : 'Confirm'}
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }
