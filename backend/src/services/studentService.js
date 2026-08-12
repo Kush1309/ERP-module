@@ -108,6 +108,12 @@ const getStudentsList = async (queryOpts) => {
     page = Math.max(parseInt(page, 10) || 1, 1);
     limit = Math.min(Math.max(parseInt(limit, 10) || 10, 1), 100);
 
+    // Sanitize string conversions to prevent NoSQL injection
+    if (className) className = String(className);
+    if (section) section = String(section);
+    if (status) status = String(status);
+    if (search) search = String(search);
+
     const query = {};
 
     if (className) query.class = className;
