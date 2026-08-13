@@ -25,12 +25,19 @@ router.use('/timetable', timetableRoutes);
 
 const teacherExamRoutes = require('./teacherExamRoutes');
 const teacherTimetableRoutes = require('./teacherTimetableRoutes');
+const teacherNoticeRoutes = require('./teacherNoticeRoutes');
 router.use('/teacher/exams', teacherExamRoutes);
 router.use('/teacher/timetable', teacherTimetableRoutes);
+router.use('/teacher/notices', teacherNoticeRoutes);
 
 const studentResultRoutes = require('./studentResultRoutes');
 const studentTimetableRoutes = require('./studentTimetableRoutes');
+const studentNoticeRoutes = require('./studentNoticeRoutes');
 router.use('/student/results', studentResultRoutes);
 router.use('/student/timetable', studentTimetableRoutes);
+router.use('/student/notices', studentNoticeRoutes);
+
+const noticeRoutes = require('./noticeRoutes');
+router.use('/notices', noticeRoutes);
 
 module.exports = router;

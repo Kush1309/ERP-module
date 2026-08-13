@@ -87,6 +87,9 @@ function StudentDashboardPage() {
                     <Link to="/student/timetable">
                         <Button type="button" variant="secondary">My Timetable</Button>
                     </Link>
+                    <Link to="/student/notices">
+                        <Button type="button" variant="secondary">Noticeboard</Button>
+                    </Link>
                 </div>
             </div>
 

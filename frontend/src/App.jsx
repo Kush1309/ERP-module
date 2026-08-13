@@ -35,6 +35,9 @@ import TeacherMarksEntryPage from './pages/teacher/TeacherMarksEntryPage';
 import TimetableManagementPage from './pages/admin/TimetableManagementPage';
 import TeacherTimetablePage from './pages/teacher/TeacherTimetablePage';
 import StudentTimetablePage from './pages/student/StudentTimetablePage';
+import NoticeManagementPage from './pages/admin/NoticeManagementPage';
+import TeacherNoticesPage from './pages/teacher/TeacherNoticesPage';
+import StudentNoticesPage from './pages/student/StudentNoticesPage';
 import { ROLES } from './constants/roles';
 
 function App() {
@@ -208,6 +211,15 @@ function App() {
         />
 
         <Route
+          path="/admin/notices"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+              <NoticeManagementPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
           path="/teacher"
           element={
             <ProtectedRoute allowedRoles={[ROLES.TEACHER]}>
@@ -271,6 +283,15 @@ function App() {
         />
 
         <Route
+          path="/teacher/notices"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.TEACHER]}>
+              <TeacherNoticesPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
           path="/student/dashboard"
           element={
             <ProtectedRoute allowedRoles={[ROLES.STUDENT]}>
@@ -302,6 +323,15 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={[ROLES.STUDENT]}>
               <StudentTimetablePage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/student/notices"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.STUDENT]}>
+              <StudentNoticesPage />
             </ProtectedRoute>
           }
         />
