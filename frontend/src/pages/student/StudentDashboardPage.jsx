@@ -80,9 +80,14 @@ function StudentDashboardPage() {
                     <h1 className="font-display text-3xl font-semibold text-ink-900">Student Dashboard</h1>
                     <p className="mt-2 text-ink-600">Welcome, {firstName || 'Not available'} {lastName || ''}</p>
                 </div>
-                <Link to="/student/attendance">
-                    <Button type="button" variant="secondary">My Attendance</Button>
-                </Link>
+                <div className="flex gap-2">
+                    <Link to="/student/attendance">
+                        <Button type="button" variant="secondary">My Attendance</Button>
+                    </Link>
+                    <Link to="/student/timetable">
+                        <Button type="button" variant="secondary">My Timetable</Button>
+                    </Link>
+                </div>
             </div>
 
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">

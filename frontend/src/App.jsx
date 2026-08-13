@@ -32,6 +32,9 @@ import ExaminationDetailsPage from './pages/admin/ExaminationDetailsPage';
 import SubjectManagementPage from './pages/admin/SubjectManagementPage';
 import TeacherExaminationPage from './pages/teacher/TeacherExaminationPage';
 import TeacherMarksEntryPage from './pages/teacher/TeacherMarksEntryPage';
+import TimetableManagementPage from './pages/admin/TimetableManagementPage';
+import TeacherTimetablePage from './pages/teacher/TeacherTimetablePage';
+import StudentTimetablePage from './pages/student/StudentTimetablePage';
 import { ROLES } from './constants/roles';
 
 function App() {
@@ -196,6 +199,15 @@ function App() {
         />
 
         <Route
+          path="/admin/timetable"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+              <TimetableManagementPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
           path="/teacher"
           element={
             <ProtectedRoute allowedRoles={[ROLES.TEACHER]}>
@@ -250,6 +262,15 @@ function App() {
         />
 
         <Route
+          path="/teacher/timetable"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.TEACHER]}>
+              <TeacherTimetablePage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
           path="/student/dashboard"
           element={
             <ProtectedRoute allowedRoles={[ROLES.STUDENT]}>
@@ -272,6 +293,15 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={[ROLES.STUDENT]}>
               <StudentResultsPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/student/timetable"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.STUDENT]}>
+              <StudentTimetablePage />
             </ProtectedRoute>
           }
         />

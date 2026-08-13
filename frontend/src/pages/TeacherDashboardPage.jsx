@@ -21,6 +21,9 @@ function TeacherDashboardPage() {
           <Link to="/teacher/attendance/report">
             <Button type="button" variant="secondary">Attendance Report</Button>
           </Link>
+          <Link to="/teacher/timetable">
+            <Button type="button" variant="secondary">My Timetable</Button>
+          </Link>
         </div>
       </div>
     </RoleDashboard>
