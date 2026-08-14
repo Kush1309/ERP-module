@@ -40,7 +40,7 @@ export default function SubjectManagementPage() {
                 const queryParams = {};
                 if (searchQuery) queryParams.search = searchQuery;
                 const result = await getSubjects(queryParams);
-                setSubjects(result || []);
+                setSubjects(result?.subjects || result?.data || (Array.isArray(result) ? result : []));
             } catch {
                 setSubjects([]);
                 setError('Unable to load subjects.');
