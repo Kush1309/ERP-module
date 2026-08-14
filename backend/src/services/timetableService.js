@@ -2,7 +2,24 @@ const mongoose = require('mongoose');
 const Timetable = require('../models/Timetable');
 const Teacher = require('../models/Teacher');
 const Subject = require('../models/Subject');
+const User = require('../models/User');
 const AppError = require('../utils/AppError');
+
+const resolveTeacher = async (teacherInput) => {
+    if (mongoose.Types.ObjectId.isValid(teacherInput)) {
+        return await Teacher.findById(teacherInput).lean();
+    }
+    const user = await User.findOne({ loginId: teacherInput }).lean();
+    if (!user) return null;
+    return await Teacher.findOne({ user: user._id }).lean();
+};
+
+const resolveSubject = async (subjectInput) => {
+    if (mongoose.Types.ObjectId.isValid(subjectInput)) {
+        return await Subject.findById(subjectInput).lean();
+    }
+    return await Subject.findOne({ code: subjectInput.toUpperCase() }).lean();
+};
 
 // Helper to convert HH:MM to minutes since midnight for easy comparison
 const timeToMinutes = (timeStr) => {
@@ -92,14 +109,13 @@ const createTimetable = async (data) => {
     // Basic validation
     const { teacher, subject, class: className, dayOfWeek, startTime, endTime } = data;
 
-    if (!mongoose.Types.ObjectId.isValid(teacher)) throw new AppError('Invalid Teacher ID', 400);
-    if (!mongoose.Types.ObjectId.isValid(subject)) throw new AppError('Invalid Subject ID', 400);
+    const teacherExists = await resolveTeacher(teacher);
+    if (!teacherExists) throw new AppError('Invalid Teacher ID or Referenced Teacher does not exist', 400);
+    data.teacher = teacherExists._id;
 
-    const teacherExists = await Teacher.findById(teacher).lean();
-    if (!teacherExists) throw new AppError('Referenced Teacher does not exist', 404);
-
-    const subjectExists = await Subject.findById(subject).lean();
-    if (!subjectExists) throw new AppError('Referenced Subject does not exist', 404);
+    const subjectExists = await resolveSubject(subject);
+    if (!subjectExists) throw new AppError('Invalid Subject ID or Referenced Subject does not exist', 400);
+    data.subject = subjectExists._id;
 
     if (timeToMinutes(startTime) >= timeToMinutes(endTime)) {
         throw new AppError('Start time must strictly precede End time', 400);
@@ -197,17 +213,18 @@ const updateTimetable = async (id, data) => {
     // Merge existing with safeUpdate to check conflicts correctly
     const mergedData = { ...existing, ...safeUpdate };
 
-    if (safeUpdate.teacher && !mongoose.Types.ObjectId.isValid(safeUpdate.teacher)) throw new AppError('Invalid Teacher ID', 400);
-    if (safeUpdate.subject && !mongoose.Types.ObjectId.isValid(safeUpdate.subject)) throw new AppError('Invalid Subject ID', 400);
-
-    if (safeUpdate.teacher && safeUpdate.teacher.toString() !== existing.teacher.toString()) {
-        const teacherExists = await Teacher.findById(safeUpdate.teacher).lean();
-        if (!teacherExists) throw new AppError('Referenced Teacher does not exist', 404);
+    if (safeUpdate.teacher) {
+        const teacherExists = await resolveTeacher(safeUpdate.teacher);
+        if (!teacherExists) throw new AppError('Invalid Teacher ID or Referenced Teacher does not exist', 400);
+        mergedData.teacher = teacherExists._id;
+        safeUpdate.teacher = teacherExists._id;
     }
 
-    if (safeUpdate.subject && safeUpdate.subject.toString() !== existing.subject.toString()) {
-        const subjectExists = await Subject.findById(safeUpdate.subject).lean();
-        if (!subjectExists) throw new AppError('Referenced Subject does not exist', 404);
+    if (safeUpdate.subject) {
+        const subjectExists = await resolveSubject(safeUpdate.subject);
+        if (!subjectExists) throw new AppError('Invalid Subject ID or Referenced Subject does not exist', 400);
+        mergedData.subject = subjectExists._id;
+        safeUpdate.subject = subjectExists._id;
     }
 
     if (timeToMinutes(mergedData.startTime) >= timeToMinutes(mergedData.endTime)) {

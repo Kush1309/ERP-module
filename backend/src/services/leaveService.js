@@ -6,7 +6,7 @@ const Student = require('../models/Student');
 const ParentProfile = require('../models/ParentProfile');
 const AppError = require('../utils/AppError');
 
-const { isValidObjectId } = mongoose.Types;
+const { isValidObjectId } = mongoose;
 
 const validateObjectId = (id, message = 'Invalid ObjectId provided') => {
     if (!id || !isValidObjectId(id)) {

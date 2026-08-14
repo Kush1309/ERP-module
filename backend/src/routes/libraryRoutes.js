@@ -2,8 +2,8 @@ const express = require('express');
 const router = express.Router();
 
 const libraryController = require('../controllers/libraryController');
-const { authenticateUser, authorizeRoles } = require('../middlewares/authMiddleware');
-const { ROLES } = require('../utils/constants');
+const { authenticateUser, authorizeRoles } = require('../middlewares/auth');
+const { ROLES } = require('../constants/roles');
 
 // Apply authentication firewall universally
 router.use(authenticateUser);

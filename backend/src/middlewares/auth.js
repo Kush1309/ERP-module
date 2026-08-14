@@ -29,6 +29,7 @@ const authenticateUser = asyncHandler(async (req, res, next) => {
   }
 
   req.user = {
+    _id: user._id,
     id: user._id.toString(),
     loginId: user.loginId,
     role: user.role,

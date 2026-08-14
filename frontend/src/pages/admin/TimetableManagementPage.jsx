@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { getTimetables, createTimetable, updateTimetable, deleteTimetable } from '../../services/timetableApi';
+import { getSubjects } from '../../services/subjectApi';
+import { getTeachers } from '../../services/teacherApi';
 import Card from '../../components/Card';
 import Button from '../../components/Button';
 import Modal from '../../components/Modal';
@@ -8,6 +10,9 @@ export default function TimetableManagementPage() {
     const [timetables, setTimetables] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+
+    const [subjectsList, setSubjectsList] = useState([]);
+    const [teachersList, setTeachersList] = useState([]);
 
     // Pagination & filters
     const [page, setPage] = useState(1);
@@ -48,6 +53,23 @@ export default function TimetableManagementPage() {
             setLoading(false);
         }
     };
+
+    const fetchOptions = async () => {
+        try {
+            const [subjRes, teachRes] = await Promise.all([
+                getSubjects({ limit: 100 }),
+                getTeachers({ limit: 100 })
+            ]);
+            setSubjectsList(subjRes.subjects || subjRes.data || []);
+            setTeachersList(teachRes.teachers || teachRes.data || []);
+        } catch (err) {
+            console.error('Failed to load options', err);
+        }
+    };
+
+    useEffect(() => {
+        fetchOptions();
+    }, []);
 
     useEffect(() => {
         fetchTimetables();
@@ -213,12 +235,18 @@ export default function TimetableManagementPage() {
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium mb-1 text-ink-700">Subject ID *</label>
-                            <input required type="text" className="w-full border rounded px-3 py-2" value={formData.subject} onChange={e => setFormData({ ...formData, subject: e.target.value })} />
+                            <label className="block text-sm font-medium mb-1 text-ink-700">Subject *</label>
+                            <select required className="w-full border rounded px-3 py-2" value={formData.subject} onChange={e => setFormData({ ...formData, subject: e.target.value })}>
+                                <option value="">Select Subject...</option>
+                                {subjectsList.map(s => <option key={s._id} value={s._id}>{s.name || s.subjectName} ({s.code || s.subjectCode})</option>)}
+                            </select>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium mb-1 text-ink-700">Teacher ID *</label>
-                            <input required type="text" className="w-full border rounded px-3 py-2" value={formData.teacher} onChange={e => setFormData({ ...formData, teacher: e.target.value })} />
+                            <label className="block text-sm font-medium mb-1 text-ink-700">Teacher *</label>
+                            <select required className="w-full border rounded px-3 py-2" value={formData.teacher} onChange={e => setFormData({ ...formData, teacher: e.target.value })}>
+                                <option value="">Select Teacher...</option>
+                                {teachersList.map(t => <option key={t._id} value={t._id}>{t.firstName} {t.lastName} - {t.email}</option>)}
+                            </select>
                         </div>
 
                         <div>

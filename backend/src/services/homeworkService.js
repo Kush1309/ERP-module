@@ -6,7 +6,7 @@ const Student = require('../models/Student');
 const ParentProfile = require('../models/ParentProfile');
 const AppError = require('../utils/AppError');
 
-const { isValidObjectId } = mongoose.Types;
+const { isValidObjectId } = mongoose;
 
 const validateObjectId = (id, message = 'Invalid ObjectId provided') => {
     if (!id || !isValidObjectId(id)) {
@@ -50,9 +50,15 @@ const createHomework = async (userId, data) => {
 
         payload.teacherId = teacher._id;
     } else if (userRole.role === 'ADMIN') {
-        if (!data.teacherId) throw new AppError('Admin must provide teacherId', 400);
-        validateObjectId(data.teacherId, 'Invalid teacherId');
-        payload.teacherId = data.teacherId;
+        if (data.teacherId) {
+            validateObjectId(data.teacherId, 'Invalid teacherId');
+            payload.teacherId = data.teacherId;
+        } else {
+            // Auto-assign the teacher mapped to that class & section
+            const teacher = await Teacher.findOne({ assignedClass: payload.class, assignedSection: payload.section }).lean();
+            if (!teacher) throw new AppError('No teacher found for this Class and Section. Please assign a teacher to this class first.', 404);
+            payload.teacherId = teacher._id;
+        }
     }
 
     const homework = await Homework.create(payload);

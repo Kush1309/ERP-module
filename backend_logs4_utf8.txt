@@ -1,0 +1,21 @@
+﻿school-erp-backend  | 
+school-erp-backend  | > school-erp-backend@1.0.0 start
+school-erp-backend  | > node src/server.js
+school-erp-backend  | 
+school-erp-backend  | /usr/src/app/node_modules/express/lib/router/index.js:462
+school-erp-backend  |     throw new TypeError('Router.use() requires a middleware function')
+school-erp-backend  |     ^
+school-erp-backend  | 
+school-erp-backend  | TypeError: Router.use() requires a middleware function
+school-erp-backend  |     at Function.use (/usr/src/app/node_modules/express/lib/router/index.js:462:11)
+school-erp-backend  |     at Object.<anonymous> (/usr/src/app/src/routes/feeRoutes.js:7:8)
+school-erp-backend  |     at Module._compile (node:internal/modules/cjs/loader:1521:14)
+school-erp-backend  |     at Module._extensions..js (node:internal/modules/cjs/loader:1623:10)
+school-erp-backend  |     at Module.load (node:internal/modules/cjs/loader:1266:32)
+school-erp-backend  |     at Module._load (node:internal/modules/cjs/loader:1091:12)
+school-erp-backend  |     at Module.require (node:internal/modules/cjs/loader:1289:19)
+school-erp-backend  |     at require (node:internal/modules/helpers:182:18)
+school-erp-backend  |     at Object.<anonymous> (/usr/src/app/src/routes/index.js:57:19)
+school-erp-backend  |     at Module._compile (node:internal/modules/cjs/loader:1521:14)
+school-erp-backend  | 
+school-erp-backend  | Node.js v20.20.2
