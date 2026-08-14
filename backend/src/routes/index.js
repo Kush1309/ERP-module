@@ -40,6 +40,9 @@ router.use('/student/notices', studentNoticeRoutes);
 const noticeRoutes = require('./noticeRoutes');
 router.use('/notices', noticeRoutes);
 
+const messageRoutes = require('./messageRoutes');
+router.use('/messages', messageRoutes);
+
 const parentRoutes = require('./parentRoutes');
 const parentAttendanceRoutes = require('./parentAttendanceRoutes');
 const parentResultRoutes = require('./parentResultRoutes');

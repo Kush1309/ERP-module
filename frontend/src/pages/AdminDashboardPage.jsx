@@ -71,6 +71,15 @@ function AdminDashboardPage() {
             </Link>
           </div>
         </div>
+        <div>
+          <h2 className="text-lg font-semibold text-ink-900 mb-3">Communication</h2>
+          <div className="grid sm:grid-cols-2 gap-4">
+            <Link to="/messages" className="block p-4 rounded-xl border border-ink-200 bg-white hover:border-brand-300 hover:shadow-sm transition-all text-left">
+              <h3 className="font-medium text-ink-900">Direct Messages</h3>
+              <p className="mt-1 text-sm text-ink-500">Communicate securely with teachers, parents, and students.</p>
+            </Link>
+          </div>
+        </div>
       </div>
     </RoleDashboard>
   );

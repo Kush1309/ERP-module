@@ -50,10 +50,13 @@ function ParentDashboardPage() {
 
   return (
     <div className="mx-auto w-full max-w-5xl relative">
-      <div className="mb-6">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-600">Parent workspace</p>
-        <h1 className="mt-2 font-display text-3xl font-semibold text-ink-900">Welcome</h1>
-        <p className="mt-2 text-sm text-ink-600">You have {students.length} linked student(s).</p>
+      <div className="mb-6 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-600">Parent workspace</p>
+          <h1 className="mt-2 font-display text-3xl font-semibold text-ink-900">Welcome</h1>
+          <p className="mt-2 text-sm text-ink-600">You have {students.length} linked student(s).</p>
+        </div>
+        <button onClick={() => navigate('/messages')} className="px-5 py-2 font-medium bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition-colors">Direct Messages</button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

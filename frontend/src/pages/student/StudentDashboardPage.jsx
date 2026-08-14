@@ -90,6 +90,9 @@ function StudentDashboardPage() {
                     <Link to="/student/notices">
                         <Button type="button" variant="secondary">Noticeboard</Button>
                     </Link>
+                    <Link to="/messages">
+                        <Button type="button" variant="primary">Messages</Button>
+                    </Link>
                 </div>
             </div>
 
