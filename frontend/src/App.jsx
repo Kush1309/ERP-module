@@ -415,7 +415,6 @@ function App() {
             </ProtectedRoute>
           }
         />
-
         {/* Catch all route */}
         <Route path="*" element={<NotFoundPage />} />
       </Route>

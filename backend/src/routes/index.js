@@ -45,7 +45,6 @@ router.use('/messages', messageRoutes);
 
 const homeworkRoutes = require('./homeworkRoutes');
 router.use('/homework', homeworkRoutes);
-
 const parentRoutes = require('./parentRoutes');
 const parentAttendanceRoutes = require('./parentAttendanceRoutes');
 const parentResultRoutes = require('./parentResultRoutes');
