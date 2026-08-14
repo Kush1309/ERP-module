@@ -54,11 +54,14 @@ const parentAttendanceRoutes = require('./parentAttendanceRoutes');
 const parentResultRoutes = require('./parentResultRoutes');
 const parentTimetableRoutes = require('./parentTimetableRoutes');
 const parentNoticeRoutes = require('./parentNoticeRoutes');
+const feeRoutes = require('./feeRoutes');
 
 router.use('/parent/notices', parentNoticeRoutes);
 router.use('/parent', parentRoutes);
 router.use('/parent', parentAttendanceRoutes);
 router.use('/parent', parentResultRoutes);
 router.use('/parent', parentTimetableRoutes);
+
+router.use('/fees', feeRoutes);
 
 module.exports = router;

@@ -99,6 +99,9 @@ function StudentDashboardPage() {
                     <Link to="/library">
                         <Button type="button" variant="secondary">Library</Button>
                     </Link>
+                    <Link to="/fees">
+                        <Button type="button" variant="secondary">Fees</Button>
+                    </Link>
                     <Link to="/messages">
                         <Button type="button" variant="primary">Messages</Button>
                     </Link>

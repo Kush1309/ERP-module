@@ -48,6 +48,7 @@ import InboxPage from './pages/messages/InboxPage';
 import HomeworkPage from './pages/HomeworkPage';
 import LeavePage from './pages/LeavePage';
 import LibraryPage from './pages/LibraryPage';
+import FeePage from './pages/FeePage';
 import { ROLES } from './constants/roles';
 
 function App() {
@@ -430,6 +431,14 @@ function App() {
           element={
             <ProtectedRoute>
               <LibraryPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/fees"
+          element={
+            <ProtectedRoute>
+              <FeePage />
             </ProtectedRoute>
           }
         />

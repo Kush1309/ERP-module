@@ -60,6 +60,7 @@ function ParentDashboardPage() {
           <button onClick={() => navigate('/homework')} className="px-5 py-2 font-medium bg-brand-100 text-brand-700 rounded-lg hover:bg-brand-200 transition-colors border border-brand-200">Homework</button>
           <button onClick={() => navigate('/leaves')} className="px-5 py-2 font-medium bg-brand-100 text-brand-700 rounded-lg hover:bg-brand-200 transition-colors border border-brand-200">Leave</button>
           <button onClick={() => navigate('/library')} className="px-5 py-2 font-medium bg-brand-100 text-brand-700 rounded-lg hover:bg-brand-200 transition-colors border border-brand-200">Library</button>
+          <button onClick={() => navigate('/fees')} className="px-5 py-2 font-medium bg-brand-100 text-brand-700 rounded-lg hover:bg-brand-200 transition-colors border border-brand-200">Fees</button>
           <button onClick={() => navigate('/messages')} className="px-5 py-2 font-medium bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition-colors">Direct Messages</button>
         </div>
       </div>
