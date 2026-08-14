@@ -38,6 +38,12 @@ import StudentTimetablePage from './pages/student/StudentTimetablePage';
 import NoticeManagementPage from './pages/admin/NoticeManagementPage';
 import TeacherNoticesPage from './pages/teacher/TeacherNoticesPage';
 import StudentNoticesPage from './pages/student/StudentNoticesPage';
+
+import ParentStudentDetailsPage from './pages/parent/ParentStudentDetailsPage';
+import ParentAttendancePage from './pages/parent/ParentAttendancePage';
+import ParentResultsPage from './pages/parent/ParentResultsPage';
+import ParentTimetablePage from './pages/parent/ParentTimetablePage';
+import ParentNoticesPage from './pages/parent/ParentNoticesPage';
 import { ROLES } from './constants/roles';
 
 function App() {
@@ -345,6 +351,52 @@ function App() {
           }
         />
 
+        <Route
+          path="/parent/students/:id"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.PARENT]}>
+              <ParentStudentDetailsPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/parent/attendance/:id"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.PARENT]}>
+              <ParentAttendancePage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/parent/results/:id"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.PARENT]}>
+              <ParentResultsPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/parent/timetable/:id"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.PARENT]}>
+              <ParentTimetablePage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/parent/notices"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.PARENT]}>
+              <ParentNoticesPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Catch all route */}
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>
