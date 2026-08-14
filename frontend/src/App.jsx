@@ -47,6 +47,7 @@ import ParentNoticesPage from './pages/parent/ParentNoticesPage';
 import InboxPage from './pages/messages/InboxPage';
 import HomeworkPage from './pages/HomeworkPage';
 import LeavePage from './pages/LeavePage';
+import LibraryPage from './pages/LibraryPage';
 import { ROLES } from './constants/roles';
 
 function App() {
@@ -421,6 +422,14 @@ function App() {
           element={
             <ProtectedRoute>
               <LeavePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/library"
+          element={
+            <ProtectedRoute>
+              <LibraryPage />
             </ProtectedRoute>
           }
         />

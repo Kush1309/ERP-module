@@ -33,6 +33,9 @@ function TeacherDashboardPage() {
           <Link to="/leaves">
             <Button type="button" variant="secondary">Leave</Button>
           </Link>
+          <Link to="/library">
+            <Button type="button" variant="secondary">Library</Button>
+          </Link>
           <Link to="/messages">
             <Button type="button" variant="secondary">Messages</Button>
           </Link>

@@ -47,6 +47,8 @@ const homeworkRoutes = require('./homeworkRoutes');
 router.use('/homework', homeworkRoutes);
 const leaveRoutes = require('./leaveRoutes');
 router.use('/leaves', leaveRoutes);
+const libraryRoutes = require('./libraryRoutes');
+router.use('/library', libraryRoutes);
 const parentRoutes = require('./parentRoutes');
 const parentAttendanceRoutes = require('./parentAttendanceRoutes');
 const parentResultRoutes = require('./parentResultRoutes');

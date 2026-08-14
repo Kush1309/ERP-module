@@ -98,6 +98,15 @@ function AdminDashboardPage() {
             </Link>
           </div>
         </div>
+        <div>
+          <h2 className="text-lg font-semibold text-ink-900 mb-3">Library Management</h2>
+          <div className="grid sm:grid-cols-2 gap-4">
+            <Link to="/library" className="block p-4 rounded-xl border border-ink-200 bg-white hover:border-brand-300 hover:shadow-sm transition-all text-left">
+              <h3 className="font-medium text-ink-900">Library</h3>
+              <p className="mt-1 text-sm text-ink-500">Manage catalogues, checkout books, and enforce return states.</p>
+            </Link>
+          </div>
+        </div>
       </div>
     </RoleDashboard>
   );
