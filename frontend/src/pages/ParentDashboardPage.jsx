@@ -56,7 +56,10 @@ function ParentDashboardPage() {
           <h1 className="mt-2 font-display text-3xl font-semibold text-ink-900">Welcome</h1>
           <p className="mt-2 text-sm text-ink-600">You have {students.length} linked student(s).</p>
         </div>
-        <button onClick={() => navigate('/messages')} className="px-5 py-2 font-medium bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition-colors">Direct Messages</button>
+        <div className="flex gap-2 flex-wrap">
+          <button onClick={() => navigate('/homework')} className="px-5 py-2 font-medium bg-brand-100 text-brand-700 rounded-lg hover:bg-brand-200 transition-colors border border-brand-200">Homework</button>
+          <button onClick={() => navigate('/messages')} className="px-5 py-2 font-medium bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition-colors">Direct Messages</button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

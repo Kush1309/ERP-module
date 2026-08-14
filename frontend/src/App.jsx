@@ -45,6 +45,7 @@ import ParentResultsPage from './pages/parent/ParentResultsPage';
 import ParentTimetablePage from './pages/parent/ParentTimetablePage';
 import ParentNoticesPage from './pages/parent/ParentNoticesPage';
 import InboxPage from './pages/messages/InboxPage';
+import HomeworkPage from './pages/HomeworkPage';
 import { ROLES } from './constants/roles';
 
 function App() {
@@ -402,6 +403,15 @@ function App() {
           element={
             <ProtectedRoute>
               <InboxPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/homework"
+          element={
+            <ProtectedRoute>
+              <HomeworkPage />
             </ProtectedRoute>
           }
         />
