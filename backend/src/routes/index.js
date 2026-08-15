@@ -64,4 +64,7 @@ router.use('/parent', parentTimetableRoutes);
 
 router.use('/fees', feeRoutes);
 
+const transportRoutes = require('./transportRoutes');
+router.use('/transport', transportRoutes);
+
 module.exports = router;

@@ -7,6 +7,7 @@ import {
     deleteHomework
 } from '../services/homeworkApi';
 import Modal from '../components/Modal';
+import Button from '../components/Button';
 
 function HomeworkPage() {
     const { user } = useAuth();
@@ -139,12 +140,12 @@ function HomeworkPage() {
                 </div>
                 {isEditingAllowed && (
                     <div className="mt-4 sm:mt-0">
-                        <button
+                        <Button
                             onClick={() => handleOpenModal()}
-                            className="inline-flex items-center justify-center rounded-lg border border-transparent bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-700"
+                            className="whitespace-nowrap"
                         >
-                            Create Homework
-                        </button>
+                            + Create Homework
+                        </Button>
                     </div>
                 )}
             </div>
@@ -155,7 +156,7 @@ function HomeworkPage() {
                     placeholder="Search homework..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    className="block w-full rounded-lg border-ink-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 sm:text-sm"
+                    className="block w-full rounded-md border border-ink-300 px-3 py-2 text-base text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                 />
                 {isEditingAllowed && (
                     <>
@@ -164,14 +165,14 @@ function HomeworkPage() {
                             placeholder="Filter by Class"
                             value={classFilter}
                             onChange={(e) => setClassFilter(e.target.value)}
-                            className="block w-full rounded-lg border-ink-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 sm:text-sm"
+                            className="block w-full rounded-md border border-ink-300 px-3 py-2 text-base text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                         />
                         <input
                             type="text"
                             placeholder="Filter by Section"
                             value={sectionFilter}
                             onChange={(e) => setSectionFilter(e.target.value)}
-                            className="block w-full rounded-lg border-ink-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 sm:text-sm"
+                            className="block w-full rounded-md border border-ink-300 px-3 py-2 text-base text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                         />
                     </>
                 )}
