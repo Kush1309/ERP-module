@@ -11,6 +11,7 @@ import {
     returnBook
 } from '../services/libraryApi';
 import Modal from '../components/Modal';
+import Button from '../components/Button';
 
 function LibraryPage() {
     const { user } = useAuth();
@@ -235,18 +236,19 @@ function LibraryPage() {
                 </div>
                 {isAdmin && (
                     <div className="mt-4 sm:mt-0 flex gap-2">
-                        <button
+                        <Button
+                            variant="secondary"
                             onClick={() => handleOpenIssueModal()}
-                            className="inline-flex items-center justify-center rounded-lg border border-ink-300 bg-white px-4 py-2 text-sm font-medium text-ink-700 shadow-sm hover:bg-ink-50"
+                            className="whitespace-nowrap"
                         >
                             Issue Book
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                             onClick={() => handleOpenBookModal()}
-                            className="inline-flex items-center justify-center rounded-lg border border-transparent bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-700"
+                            className="whitespace-nowrap"
                         >
-                            Add Book
-                        </button>
+                            + Add Book
+                        </Button>
                     </div>
                 )}
             </div>
@@ -257,8 +259,8 @@ function LibraryPage() {
                     <button
                         onClick={() => setActiveTab('CATALOGUE')}
                         className={`${activeTab === 'CATALOGUE'
-                                ? 'border-brand-500 text-brand-600'
-                                : 'border-transparent text-ink-500 hover:border-ink-300 hover:text-ink-700'
+                            ? 'border-brand-500 text-brand-600'
+                            : 'border-transparent text-ink-500 hover:border-ink-300 hover:text-ink-700'
                             } whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium`}
                     >
                         Browse Catalogue
@@ -266,8 +268,8 @@ function LibraryPage() {
                     <button
                         onClick={() => setActiveTab('ISSUES')}
                         className={`${activeTab === 'ISSUES'
-                                ? 'border-brand-500 text-brand-600'
-                                : 'border-transparent text-ink-500 hover:border-ink-300 hover:text-ink-700'
+                            ? 'border-brand-500 text-brand-600'
+                            : 'border-transparent text-ink-500 hover:border-ink-300 hover:text-ink-700'
                             } whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium`}
                     >
                         {isAdmin ? 'All Issues' : 'My Issues'}
@@ -286,13 +288,13 @@ function LibraryPage() {
             {/* MAIN VIEWS */}
             {activeTab === 'CATALOGUE' && (
                 <div className="space-y-4">
-                    <div className="flex bg-white px-4 py-3 border border-ink-200 rounded-lg shadow-sm">
+                    <div className="flex bg-white px-4 py-3 border border-ink-200 rounded-md shadow-sm">
                         <input
                             type="text"
                             placeholder="Search by title, author, isbn..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full border-none focus:ring-0 text-sm p-0 m-0"
+                            className="w-full border-none focus:ring-0 text-base p-0 m-0"
                         />
                     </div>
                     {loading ? (
@@ -388,7 +390,7 @@ function LibraryPage() {
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap">
                                                 <span className={`inline-flex px-2 text-xs font-semibold rounded-full ${issue.status === 'RETURNED' ? 'bg-green-100 text-green-800' :
-                                                        issue.status === 'OVERDUE' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
+                                                    issue.status === 'OVERDUE' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
                                                     }`}>
                                                     {issue.status}
                                                 </span>
