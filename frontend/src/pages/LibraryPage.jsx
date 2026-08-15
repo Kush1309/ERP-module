@@ -437,38 +437,38 @@ function LibraryPage() {
                         <form onSubmit={handleBookSubmit} className="space-y-4 pt-4">
                             <div>
                                 <label className="block text-sm font-medium text-ink-700">Title *</label>
-                                <input type="text" required value={bookForm.title} onChange={e => setBookForm({ ...bookForm, title: e.target.value })} className="mt-1 w-full rounded-md border-ink-300 focus:ring-brand-500 focus:border-brand-500 text-sm" />
+                                <input type="text" required value={bookForm.title} onChange={e => setBookForm({ ...bookForm, title: e.target.value })} className="mt-1 w-full rounded-md border border-ink-300 px-3 py-2 text-base text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500" />
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-ink-700">Author *</label>
-                                    <input type="text" required value={bookForm.author} onChange={e => setBookForm({ ...bookForm, author: e.target.value })} className="mt-1 w-full rounded-md border-ink-300 focus:ring-brand-500 focus:border-brand-500 text-sm" />
+                                    <input type="text" required value={bookForm.author} onChange={e => setBookForm({ ...bookForm, author: e.target.value })} className="mt-1 w-full rounded-md border border-ink-300 px-3 py-2 text-base text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500" />
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-ink-700">ISBN *</label>
-                                    <input type="text" required value={bookForm.isbn} onChange={e => setBookForm({ ...bookForm, isbn: e.target.value })} className="mt-1 w-full rounded-md border-ink-300 focus:ring-brand-500 focus:border-brand-500 text-sm" />
+                                    <input type="text" required value={bookForm.isbn} onChange={e => setBookForm({ ...bookForm, isbn: e.target.value })} className="mt-1 w-full rounded-md border border-ink-300 px-3 py-2 text-base text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500" />
                                 </div>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-ink-700">Publisher</label>
-                                    <input type="text" value={bookForm.publisher} onChange={e => setBookForm({ ...bookForm, publisher: e.target.value })} className="mt-1 w-full rounded-md border-ink-300 focus:ring-brand-500 focus:border-brand-500 text-sm" />
+                                    <input type="text" value={bookForm.publisher} onChange={e => setBookForm({ ...bookForm, publisher: e.target.value })} className="mt-1 w-full rounded-md border border-ink-300 px-3 py-2 text-base text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500" />
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-ink-700">Category *</label>
-                                    <input type="text" required value={bookForm.category} onChange={e => setBookForm({ ...bookForm, category: e.target.value })} className="mt-1 w-full rounded-md border-ink-300 focus:ring-brand-500 focus:border-brand-500 text-sm" />
+                                    <input type="text" required value={bookForm.category} onChange={e => setBookForm({ ...bookForm, category: e.target.value })} className="mt-1 w-full rounded-md border border-ink-300 px-3 py-2 text-base text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500" />
                                 </div>
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-ink-700">Total Copies (Inventory) *</label>
-                                <input type="number" min="0" required value={bookForm.totalCopies} onChange={e => setBookForm({ ...bookForm, totalCopies: parseInt(e.target.value, 10) })} className="mt-1 w-full rounded-md border-ink-300 focus:ring-brand-500 focus:border-brand-500 text-sm" />
+                                <input type="number" min="0" required value={bookForm.totalCopies} onChange={e => setBookForm({ ...bookForm, totalCopies: parseInt(e.target.value, 10) })} className="mt-1 w-full rounded-md border border-ink-300 px-3 py-2 text-base text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500" />
                             </div>
 
                             <div className="mt-6 flex justify-end space-x-3">
-                                <button type="button" onClick={closeBookModal} disabled={isSubmitting} className="px-4 py-2 text-sm border border-ink-300 text-ink-700 rounded-md hover:bg-ink-50">Cancel</button>
-                                <button type="submit" disabled={isSubmitting} className="px-4 py-2 text-sm bg-brand-600 text-white rounded-md hover:bg-brand-700 disabled:opacity-50">
+                                <Button type="button" variant="secondary" onClick={closeBookModal} disabled={isSubmitting}>Cancel</Button>
+                                <Button type="submit" disabled={isSubmitting}>
                                     {isSubmitting ? 'Saving...' : 'Save Book'}
-                                </button>
+                                </Button>
                             </div>
                         </form>
                     </Modal>
@@ -478,19 +478,19 @@ function LibraryPage() {
                         <form onSubmit={handleIssueSubmit} className="space-y-4 pt-4">
                             <div>
                                 <label className="block text-sm font-medium text-ink-700">Book ID *</label>
-                                <input type="text" required value={issueForm.bookId} onChange={e => setIssueForm({ ...issueForm, bookId: e.target.value })} className="mt-1 w-full rounded-md border-ink-300 focus:ring-brand-500 focus:border-brand-500 text-sm" placeholder="Paste Book ID exactly" />
+                                <input type="text" required value={issueForm.bookId} onChange={e => setIssueForm({ ...issueForm, bookId: e.target.value })} className="mt-1 w-full rounded-md border border-ink-300 px-3 py-2 text-base text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500" placeholder="Paste Book ID exactly" />
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-ink-700">Role *</label>
-                                    <select value={issueForm.requesterModel} onChange={e => setIssueForm({ ...issueForm, requesterModel: e.target.value })} className="mt-1 w-full rounded-md border-ink-300 focus:ring-brand-500 focus:border-brand-500 text-sm">
+                                    <select value={issueForm.requesterModel} onChange={e => setIssueForm({ ...issueForm, requesterModel: e.target.value })} className="mt-1 w-full rounded-md border border-ink-300 px-3 py-2 text-base text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500">
                                         <option value="Student">Student</option>
                                         <option value="Teacher">Teacher</option>
                                     </select>
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-ink-700">User ID *</label>
-                                    <input type="text" required value={issueForm.requesterId} onChange={e => setIssueForm({ ...issueForm, requesterId: e.target.value })} className="mt-1 w-full rounded-md border-ink-300 focus:ring-brand-500 focus:border-brand-500 text-sm" placeholder="User ID" />
+                                    <input type="text" required value={issueForm.requesterId} onChange={e => setIssueForm({ ...issueForm, requesterId: e.target.value })} className="mt-1 w-full rounded-md border border-ink-300 px-3 py-2 text-base text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500" placeholder="User ID" />
                                 </div>
                             </div>
                             <div>
@@ -499,10 +499,10 @@ function LibraryPage() {
                             </div>
 
                             <div className="mt-6 flex justify-end space-x-3">
-                                <button type="button" onClick={() => setIsIssueModalOpen(false)} disabled={isSubmitting} className="px-4 py-2 text-sm border border-ink-300 text-ink-700 rounded-md hover:bg-ink-50">Cancel</button>
-                                <button type="submit" disabled={isSubmitting} className="px-4 py-2 text-sm bg-brand-600 text-white rounded-md hover:bg-brand-700 disabled:opacity-50">
+                                <Button type="button" variant="secondary" onClick={() => setIsIssueModalOpen(false)} disabled={isSubmitting}>Cancel</Button>
+                                <Button type="submit" disabled={isSubmitting}>
                                     {isSubmitting ? 'Processing...' : 'Issue Book'}
-                                </button>
+                                </Button>
                             </div>
                         </form>
                     </Modal>

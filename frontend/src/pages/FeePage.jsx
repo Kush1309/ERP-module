@@ -419,40 +419,40 @@ function FeePage() {
                 <form onSubmit={submitStructure} className="space-y-4 pt-4">
                     <div>
                         <label className="block text-sm font-medium text-ink-700">Title <span className="text-red-500">*</span></label>
-                        <input type="text" value={structureForm.title} onChange={e => setStructureForm({ ...structureForm, title: e.target.value })} required className="mt-1 block w-full rounded-md border-ink-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 sm:text-sm" />
+                        <input type="text" value={structureForm.title} onChange={e => setStructureForm({ ...structureForm, title: e.target.value })} required className="mt-1 block w-full rounded-md border border-ink-300 px-3 py-2 text-base text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500" />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-ink-700">Amount <span className="text-red-500">*</span></label>
-                            <input type="number" min="0" step="0.01" value={structureForm.amount} onChange={e => setStructureForm({ ...structureForm, amount: e.target.value })} required className="mt-1 block w-full rounded-md border-ink-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 sm:text-sm" />
+                            <input type="number" min="0" step="0.01" value={structureForm.amount} onChange={e => setStructureForm({ ...structureForm, amount: e.target.value })} required className="mt-1 block w-full rounded-md border border-ink-300 px-3 py-2 text-base text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500" />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-ink-700">Due Date</label>
-                            <input type="date" value={structureForm.dueDate} onChange={e => setStructureForm({ ...structureForm, dueDate: e.target.value })} className="mt-1 block w-full rounded-md border-ink-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 sm:text-sm" />
+                            <input type="date" value={structureForm.dueDate} onChange={e => setStructureForm({ ...structureForm, dueDate: e.target.value })} className="mt-1 block w-full rounded-md border border-ink-300 px-3 py-2 text-base text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500" />
                         </div>
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-ink-700">Applicable Classes (comma separated) <span className="text-red-500">*</span></label>
-                        <input type="text" placeholder="e.g. 10th, 9th" value={structureForm.applicableClasses} onChange={e => setStructureForm({ ...structureForm, applicableClasses: e.target.value })} required className="mt-1 block w-full rounded-md border-ink-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 sm:text-sm" />
+                        <input type="text" placeholder="e.g. 10th, 9th" value={structureForm.applicableClasses} onChange={e => setStructureForm({ ...structureForm, applicableClasses: e.target.value })} required className="mt-1 block w-full rounded-md border border-ink-300 px-3 py-2 text-base text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500" />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-ink-700">Academic Year <span className="text-red-500">*</span></label>
-                            <input type="text" placeholder="2026-2027" value={structureForm.academicYear} onChange={e => setStructureForm({ ...structureForm, academicYear: e.target.value })} required className="mt-1 block w-full rounded-md border-ink-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 sm:text-sm" />
+                            <input type="text" placeholder="2026-2027" value={structureForm.academicYear} onChange={e => setStructureForm({ ...structureForm, academicYear: e.target.value })} required className="mt-1 block w-full rounded-md border border-ink-300 px-3 py-2 text-base text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500" />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-ink-700">Status</label>
-                            <select value={structureForm.status} onChange={e => setStructureForm({ ...structureForm, status: e.target.value })} className="mt-1 block w-full rounded-md border-ink-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 sm:text-sm">
+                            <select value={structureForm.status} onChange={e => setStructureForm({ ...structureForm, status: e.target.value })} className="mt-1 block w-full rounded-md border border-ink-300 px-3 py-2 text-base text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500">
                                 <option value="ACTIVE">Active</option>
                                 <option value="INACTIVE">Inactive</option>
                             </select>
                         </div>
                     </div>
                     <div className="mt-6 flex justify-end space-x-3">
-                        <button type="button" onClick={() => setIsStructureModalOpen(false)} disabled={isSubmitting} className="rounded-md border border-ink-300 bg-white px-4 py-2 text-sm font-medium text-ink-700 shadow-sm hover:bg-ink-50">Cancel</button>
-                        <button type="submit" disabled={isSubmitting} className="rounded-md border border-transparent bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-700 disabled:opacity-50">
+                        <Button type="button" variant="secondary" onClick={() => setIsStructureModalOpen(false)} disabled={isSubmitting}>Cancel</Button>
+                        <Button type="submit" disabled={isSubmitting}>
                             {isSubmitting ? 'Saving...' : 'Save Structure'}
-                        </button>
+                        </Button>
                     </div>
                 </form>
             </Modal>
@@ -462,21 +462,21 @@ function FeePage() {
                 <form onSubmit={submitRecord} className="space-y-4 pt-4">
                     <div>
                         <label className="block text-sm font-medium text-ink-700">Student ID <span className="text-red-500">*</span></label>
-                        <input type="text" placeholder="MongoDB Object ID of Student" value={recordForm.studentId} onChange={e => setRecordForm({ ...recordForm, studentId: e.target.value })} required className="mt-1 block w-full rounded-md border-ink-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 sm:text-sm" />
+                        <input type="text" placeholder="MongoDB Object ID of Student" value={recordForm.studentId} onChange={e => setRecordForm({ ...recordForm, studentId: e.target.value })} required className="mt-1 block w-full rounded-md border border-ink-300 px-3 py-2 text-base text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500" />
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-ink-700">Fee Structure ID <span className="text-red-500">*</span></label>
-                        <input type="text" placeholder="MongoDB Object ID of Fee Structure" value={recordForm.feeStructureId} onChange={e => setRecordForm({ ...recordForm, feeStructureId: e.target.value })} required className="mt-1 block w-full rounded-md border-ink-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 sm:text-sm" />
+                        <input type="text" placeholder="MongoDB Object ID of Fee Structure" value={recordForm.feeStructureId} onChange={e => setRecordForm({ ...recordForm, feeStructureId: e.target.value })} required className="mt-1 block w-full rounded-md border border-ink-300 px-3 py-2 text-base text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500" />
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-ink-700">Custom Amount Due (Optional)</label>
-                        <input type="number" min="0" step="0.01" placeholder="Leave empty to use Structure Amount" value={recordForm.amountDue} onChange={e => setRecordForm({ ...recordForm, amountDue: e.target.value })} className="mt-1 block w-full rounded-md border-ink-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 sm:text-sm" />
+                        <input type="number" min="0" step="0.01" placeholder="Leave empty to use Structure Amount" value={recordForm.amountDue} onChange={e => setRecordForm({ ...recordForm, amountDue: e.target.value })} className="mt-1 block w-full rounded-md border border-ink-300 px-3 py-2 text-base text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500" />
                     </div>
                     <div className="mt-6 flex justify-end space-x-3">
-                        <button type="button" onClick={() => setIsRecordModalOpen(false)} disabled={isSubmitting} className="rounded-md border border-ink-300 bg-white px-4 py-2 text-sm font-medium text-ink-700 shadow-sm hover:bg-ink-50">Cancel</button>
-                        <button type="submit" disabled={isSubmitting} className="rounded-md border border-transparent bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-700 disabled:opacity-50">
+                        <Button type="button" variant="secondary" onClick={() => setIsRecordModalOpen(false)} disabled={isSubmitting}>Cancel</Button>
+                        <Button type="submit" disabled={isSubmitting}>
                             {isSubmitting ? 'Assigning...' : 'Assign Fee'}
-                        </button>
+                        </Button>
                     </div>
                 </form>
             </Modal>
@@ -493,13 +493,13 @@ function FeePage() {
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-ink-700">Payment Amount <span className="text-red-500">*</span></label>
-                            <input type="number" min="0.01" max={selectedRecord.amountDue - selectedRecord.amountPaid} step="0.01" value={paymentAmount} onChange={e => setPaymentAmount(e.target.value)} required className="mt-1 block w-full rounded-md border-ink-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 sm:text-sm" />
+                            <input type="number" min="0.01" max={selectedRecord.amountDue - selectedRecord.amountPaid} step="0.01" value={paymentAmount} onChange={e => setPaymentAmount(e.target.value)} required className="mt-1 block w-full rounded-md border border-ink-300 px-3 py-2 text-base text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500" />
                         </div>
                         <div className="mt-6 flex justify-end space-x-3">
-                            <button type="button" onClick={() => setIsPaymentModalOpen(false)} disabled={isSubmitting} className="rounded-md border border-ink-300 bg-white px-4 py-2 text-sm font-medium text-ink-700 shadow-sm hover:bg-ink-50">Cancel</button>
-                            <button type="submit" disabled={isSubmitting} className="rounded-md border border-transparent bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-700 disabled:opacity-50">
+                            <Button type="button" variant="secondary" onClick={() => setIsPaymentModalOpen(false)} disabled={isSubmitting}>Cancel</Button>
+                            <Button type="submit" disabled={isSubmitting}>
                                 {isSubmitting ? 'Processing...' : 'Process Payment'}
-                            </button>
+                            </Button>
                         </div>
                     </form>
                 )}
@@ -518,7 +518,7 @@ function FeePage() {
                             <p><strong>Status:</strong> {viewOnlyItem.status}</p>
                         </div>
                         <div className="mt-6 flex justify-end space-x-3">
-                            <button onClick={() => setViewOnlyItem(null)} className="rounded-md border border-ink-300 bg-white px-4 py-2 text-sm font-medium text-ink-700 shadow-sm hover:bg-ink-50">Close</button>
+                            <Button onClick={() => setViewOnlyItem(null)} variant="secondary">Close</Button>
                         </div>
                     </div>
                 )}

@@ -259,7 +259,7 @@ function HomeworkPage() {
                             value={formData.title}
                             onChange={handleChange}
                             required
-                            className="mt-1 block w-full rounded-md border-ink-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 sm:text-sm"
+                            className="mt-1 block w-full rounded-md border border-ink-300 px-3 py-2 text-base text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                         />
                     </div>
                     <div>
@@ -269,7 +269,7 @@ function HomeworkPage() {
                             value={formData.description}
                             onChange={handleChange}
                             rows={3}
-                            className="mt-1 block w-full rounded-md border-ink-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 sm:text-sm"
+                            className="mt-1 block w-full rounded-md border border-ink-300 px-3 py-2 text-base text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                         />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
@@ -281,7 +281,7 @@ function HomeworkPage() {
                                 value={formData.class}
                                 onChange={handleChange}
                                 required
-                                className="mt-1 block w-full rounded-md border-ink-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 sm:text-sm"
+                                className="mt-1 block w-full rounded-md border border-ink-300 px-3 py-2 text-base text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                             />
                         </div>
                         <div>
@@ -292,7 +292,7 @@ function HomeworkPage() {
                                 value={formData.section}
                                 onChange={handleChange}
                                 required
-                                className="mt-1 block w-full rounded-md border-ink-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 sm:text-sm"
+                                className="mt-1 block w-full rounded-md border border-ink-300 px-3 py-2 text-base text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                             />
                         </div>
                     </div>
@@ -305,7 +305,7 @@ function HomeworkPage() {
                                 value={formData.subject}
                                 onChange={handleChange}
                                 required
-                                className="mt-1 block w-full rounded-md border-ink-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 sm:text-sm"
+                                className="mt-1 block w-full rounded-md border border-ink-300 px-3 py-2 text-base text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                             />
                         </div>
                         <div>
@@ -315,7 +315,7 @@ function HomeworkPage() {
                                 name="dueDate"
                                 value={formData.dueDate}
                                 onChange={handleChange}
-                                className="mt-1 block w-full rounded-md border-ink-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 sm:text-sm"
+                                className="mt-1 block w-full rounded-md border border-ink-300 px-3 py-2 text-base text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                             />
                         </div>
                     </div>
@@ -325,28 +325,27 @@ function HomeworkPage() {
                             name="status"
                             value={formData.status}
                             onChange={handleChange}
-                            className="mt-1 block w-full rounded-md border-ink-300 shadow-sm focus:border-brand-500 focus:ring-brand-500 sm:text-sm"
+                            className="mt-1 block w-full rounded-md border border-ink-300 px-3 py-2 text-base text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                         >
                             <option value="DRAFT">Draft</option>
                             <option value="PUBLISHED">Published</option>
                         </select>
                     </div>
                     <div className="mt-6 flex justify-end space-x-3">
-                        <button
+                        <Button
                             type="button"
+                            variant="secondary"
                             onClick={handleCloseModal}
                             disabled={isSubmitting}
-                            className="rounded-md border border-ink-300 bg-white px-4 py-2 text-sm font-medium text-ink-700 shadow-sm hover:bg-ink-50"
                         >
                             Cancel
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                             type="submit"
                             disabled={isSubmitting}
-                            className="inline-flex justify-center rounded-md border border-transparent bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-700 disabled:opacity-50"
                         >
                             {isSubmitting ? 'Saving...' : 'Save Homework'}
-                        </button>
+                        </Button>
                     </div>
                 </form>
             </Modal>
@@ -382,12 +381,12 @@ function HomeworkPage() {
                             </div>
                         )}
                         <div className="mt-6 flex justify-end">
-                            <button
+                            <Button
                                 onClick={() => setViewOnlyHomework(null)}
-                                className="rounded-md border border-ink-300 bg-white px-4 py-2 text-sm font-medium text-ink-700 shadow-sm hover:bg-ink-50"
+                                variant="secondary"
                             >
                                 Close
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 )}
