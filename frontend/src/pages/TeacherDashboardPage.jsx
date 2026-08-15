@@ -11,7 +11,7 @@ function TeacherDashboardPage() {
       <div>
         <h2 className="mb-2 font-display text-xl font-semibold text-ink-900">Teacher Operations</h2>
         <p className="mb-4 text-sm text-ink-600">Manage your classroom attendance.</p>
-        <div className="flex gap-4">
+        <div className="flex flex-wrap gap-4">
           <Link to="/teacher/attendance">
             <Button type="button">Mark Attendance</Button>
           </Link>
