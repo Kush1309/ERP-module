@@ -7,7 +7,7 @@ services:
     ports:
       - "27017:27017"
     volumes:
-      - mongo-data:/data/db
+      - ./mongo-data:/data/db
     networks:
       - school-erp-net
 
@@ -43,8 +43,7 @@ services:
     networks:
       - school-erp-net
 
-volumes:
-  mongo-data:
+# (Removed mongo-data named volume, using local bind mount instead to prevent data loss on Windows restarts)
 
 networks:
   school-erp-net:
