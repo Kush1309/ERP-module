@@ -79,7 +79,7 @@ export default function StudentTimetablePage() {
                                 <span className="font-semibold text-ink-900">{t.dayOfWeek}</span>
                             </div>
                             <div className="text-sm text-ink-600 mb-1">{t.startTime} - {t.endTime}</div>
-                            <div className="text-sm font-medium text-ink-800">{t.subject?.subjectName}</div>
+                            <div className="text-sm font-medium text-ink-800">{t.subject?.name || t.subject?.subjectName}</div>
                             <div className="text-sm text-ink-600 mt-2">Teacher: {t.teacher?.firstName} {t.teacher?.lastName}</div>
                             <div className="text-sm text-ink-600">Room: {t.room}</div>
                         </Card>

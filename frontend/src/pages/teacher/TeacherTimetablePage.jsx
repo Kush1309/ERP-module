@@ -81,7 +81,7 @@ export default function TeacherTimetablePage() {
                                 <span className={`text-xs px-2 py-1 rounded-full ${t.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>{t.status}</span>
                             </div>
                             <div className="text-sm text-ink-600 mb-1">{t.startTime} - {t.endTime}</div>
-                            <div className="text-sm font-medium text-ink-800">{t.subject?.subjectName}</div>
+                            <div className="text-sm font-medium text-ink-800">{t.subject?.name || t.subject?.subjectName}</div>
                             <div className="text-sm text-ink-600 mt-2">Class: {t.class} ({t.section})</div>
                             <div className="text-sm text-ink-600">Room: {t.room}</div>
                         </Card>

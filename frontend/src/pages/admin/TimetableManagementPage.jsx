@@ -178,7 +178,7 @@ export default function TimetableManagementPage() {
                                     <td className="p-3">{t.academicSession} <br /><span className="text-xs text-ink-500">Room: {t.room}</span></td>
                                     <td className="p-3 font-medium">{t.class} - {t.section}</td>
                                     <td className="p-3">{t.dayOfWeek} <br /><span className="text-xs text-brand-600">{t.startTime} - {t.endTime}</span></td>
-                                    <td className="p-3">{t.subject?.subjectName} <br /><span className="text-xs text-ink-500">{t.teacher?.firstName} {t.teacher?.lastName}</span></td>
+                                    <td className="p-3">{t.subject?.name || t.subject?.subjectName} <br /><span className="text-xs text-ink-500">{t.teacher?.firstName} {t.teacher?.lastName}</span></td>
                                     <td className="p-3 text-right">
                                         <button onClick={() => openEdit(t)} className="text-brand-600 hover:underline mr-4">Edit</button>
                                         <button onClick={() => handleDelete(t._id)} className="text-red-600 hover:underline">Delete</button>
