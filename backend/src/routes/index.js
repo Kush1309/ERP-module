@@ -64,6 +64,9 @@ router.use('/parent', parentTimetableRoutes);
 
 router.use('/fees', feeRoutes);
 
+const dashboardRoutes = require('./dashboardRoutes');
+router.use('/dashboard', dashboardRoutes);
+
 const transportRoutes = require('./transportRoutes');
 router.use('/transport', transportRoutes);
 
