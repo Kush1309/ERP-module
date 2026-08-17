@@ -2,9 +2,18 @@ import { Outlet, Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { ROLE_HOME } from '../constants/roles';
 import Button from '../components/Button';
+import AdminLayout from './AdminLayout';
 
 function AppLayout() {
   const { isAuthenticated, user, logout, isLoading } = useAuth();
+
+  if (!isLoading && isAuthenticated && user?.role === 'ADMIN') {
+    return (
+      <AdminLayout>
+        <Outlet />
+      </AdminLayout>
+    );
+  }
 
   return (
     <div className="relative min-h-screen bg-page-glow">
