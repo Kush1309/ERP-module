@@ -3,6 +3,7 @@ import { useAuth } from '../hooks/useAuth';
 import { ROLE_HOME } from '../constants/roles';
 import Button from '../components/Button';
 import AdminLayout from './AdminLayout';
+import StudentLayout from './StudentLayout';
 import ThemeToggle from '../components/ThemeToggle';
 
 function AppLayout() {
@@ -13,6 +14,14 @@ function AppLayout() {
       <AdminLayout>
         <Outlet />
       </AdminLayout>
+    );
+  }
+
+  if (!isLoading && isAuthenticated && user?.role === 'STUDENT') {
+    return (
+      <StudentLayout>
+        <Outlet />
+      </StudentLayout>
     );
   }
 
