@@ -46,7 +46,25 @@ const getStudentDashboardMetrics = asyncHandler(async (req, res) => {
 });
 
 
+/**
+ * @desc    Get dashboard metrics for teacher
+ * @route   GET /api/dashboard/teacher
+ * @access  Private/Teacher
+ */
+const getTeacherDashboardMetrics = asyncHandler(async (req, res) => {
+    const userId = req.user._id;
+
+    const metrics = await dashboardService.getTeacherMetrics(userId);
+
+    res.status(200).json({
+        success: true,
+        message: 'Teacher dashboard metrics retrieved successfully',
+        data: metrics
+    });
+});
+
 module.exports = {
     getAdminDashboardMetrics,
-    getStudentDashboardMetrics
+    getStudentDashboardMetrics,
+    getTeacherDashboardMetrics
 };

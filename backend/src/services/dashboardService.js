@@ -382,7 +382,160 @@ const getStudentMetrics = async (userId) => {
     };
 };
 
+const getTeacherMetrics = async (userId) => {
+    const teacher = await Teacher.findOne({ user: userId }).lean();
+    if (!teacher) {
+        throw new Error('Teacher record not found for this user');
+    }
+
+    const { _id: teacherId, assignedClass, assignedSection } = teacher;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const dayOfWeek = today.toLocaleString('en-US', { weekday: 'long' }).toUpperCase();
+
+    const promises = [];
+
+    // 1. My Students
+    promises.push(
+        Student.countDocuments({ class: assignedClass, section: assignedSection }),
+        Student.countDocuments({ class: assignedClass, section: assignedSection, status: 'ACTIVE' })
+    );
+
+    // 2. Today's Attendance for Teacher's Class
+    promises.push(
+        Student.find({ class: assignedClass, section: assignedSection }).select('_id').lean().then(students => {
+            const studentIds = students.map(s => s._id);
+            if (!studentIds.length) return { present: 0, absent: 0 };
+            return Promise.all([
+                Attendance.countDocuments({ student: { $in: studentIds }, date: { $gte: today }, status: 'PRESENT' }),
+                Attendance.countDocuments({ student: { $in: studentIds }, date: { $gte: today }, status: 'ABSENT' })
+            ]).then(([present, absent]) => ({ present, absent }));
+        })
+    );
+
+    // 3. Pending Homework (created by this teacher OR for this class/section)
+    promises.push(
+        Homework.countDocuments({ class: assignedClass, section: assignedSection, status: 'PUBLISHED' }),
+        Homework.find({ class: assignedClass, section: assignedSection, status: 'PUBLISHED' }).sort({ dueDate: 1 }).limit(3).lean()
+    );
+
+    // 4. Upcoming Exams
+    promises.push(
+        Exam.countDocuments({ class: assignedClass, section: assignedSection, startDate: { $gt: new Date() }, status: { $in: ['PUBLISHED', 'UPCOMING'] } }),
+        Exam.findOne({ class: assignedClass, section: assignedSection, startDate: { $gt: new Date() }, status: { $in: ['PUBLISHED', 'UPCOMING'] } }).sort({ startDate: 1 }).lean()
+    );
+
+    // 5. Today's Timetable
+    promises.push(
+        Timetable.find({ teacher: teacherId, dayOfWeek })
+            .populate('subject', 'name')
+            .sort({ startTime: 1 })
+            .lean()
+    );
+
+    // 6. My Classes
+    promises.push(
+        Promise.resolve([{
+            className: assignedClass,
+            section: assignedSection,
+            subject: 'Class Teacher',
+            studentCount: null
+        }])
+    );
+
+    // 7. Recent Notices
+    promises.push(
+        Notice.find({
+            $or: [
+                { targetAudience: 'ALL' },
+                { targetAudience: 'TEACHERS' }
+            ]
+        }).sort({ createdAt: -1 }).limit(3).lean()
+    );
+
+    // 8. Leave Management
+    promises.push(
+        LeaveRequest.countDocuments({ requesterId: teacherId, requesterModel: 'Teacher', status: 'PENDING' }),
+        LeaveRequest.countDocuments({ requesterId: teacherId, requesterModel: 'Teacher', status: 'APPROVED' }),
+        LeaveRequest.countDocuments({ requesterId: teacherId, requesterModel: 'Teacher', status: 'REJECTED' })
+    );
+
+    // 9. Messages
+    promises.push(
+        Conversation.find({ participants: userId }).distinct('_id').then(async conversationIds => {
+            if (!conversationIds.length) return { unreadCount: 0, recent: [] };
+            const unreadCount = await Message.countDocuments({
+                conversation: { $in: conversationIds },
+                sender: { $ne: userId },
+                readBy: { $ne: userId }
+            });
+            // Fetch recent messages logically (requires grouping by conversation, but we'll approximate)
+            // Just return empty recent for now or minimal
+            return { unreadCount, recent: [] };
+        })
+    );
+
+    const [
+        totalStudents, activeStudents,
+        attendanceToday,
+        pendingHomeworkCount, latestHomework,
+        upcomingExamsCount, nextExam,
+        todayTimetable,
+        myClasses,
+        recentNotices,
+        pendingLeaves, approvedLeaves, rejectedLeaves,
+        messagesData
+    ] = await Promise.all(promises);
+
+    if (myClasses && myClasses.length > 0) {
+        myClasses[0].studentCount = totalStudents;
+    }
+
+    const { present, absent } = attendanceToday;
+    const totalAttendanceExpected = present + absent;
+    const attendancePercentage = totalAttendanceExpected > 0 ? Math.round((present / totalAttendanceExpected) * 100) : null;
+
+    return {
+        teacher: {
+            firstName: teacher.firstName,
+            lastName: teacher.lastName,
+            email: teacher.email,
+            assignedClass,
+            assignedSection
+        },
+        students: {
+            total: totalStudents,
+            active: activeStudents
+        },
+        attendance: {
+            percentage: attendancePercentage,
+            present: present,
+            absent: absent,
+        },
+        homework: {
+            pending: pendingHomeworkCount,
+            latest: latestHomework,
+        },
+        examinations: {
+            upcomingCount: upcomingExamsCount,
+            next: nextExam,
+        },
+        timetable: todayTimetable,
+        classes: myClasses,
+        leave: {
+            pending: pendingLeaves,
+            approved: approvedLeaves,
+            rejected: rejectedLeaves,
+        },
+        notices: recentNotices,
+        messages: messagesData,
+        library: { hasBooks: false },
+        transport: { allocation: null }
+    };
+};
+
 module.exports = {
     getAdminMetrics,
-    getStudentMetrics
+    getStudentMetrics,
+    getTeacherMetrics
 };

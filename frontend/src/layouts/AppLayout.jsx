@@ -4,24 +4,39 @@ import { ROLE_HOME } from '../constants/roles';
 import Button from '../components/Button';
 import AdminLayout from './AdminLayout';
 import StudentLayout from './StudentLayout';
+import TeacherLayout from './TeacherLayout';
 import ThemeToggle from '../components/ThemeToggle';
 
 function AppLayout() {
   const { isAuthenticated, user, logout, isLoading } = useAuth();
 
-  if (!isLoading && isAuthenticated && user?.role === 'ADMIN') {
+  if (!isLoading && isAuthenticated) {
+    if (user?.role === 'ADMIN') {
+      return (
+        <AdminLayout>
+          <Outlet />
+        </AdminLayout>
+      );
+    }
+    if (user?.role === 'STUDENT') {
+      return (
+        <StudentLayout>
+          <Outlet />
+        </StudentLayout>
+      );
+    }
+    if (user?.role === 'TEACHER') {
+      return (
+        <TeacherLayout>
+          <Outlet />
+        </TeacherLayout>
+      );
+    }
+    // Fallback for other logged in roles
     return (
       <AdminLayout>
         <Outlet />
       </AdminLayout>
-    );
-  }
-
-  if (!isLoading && isAuthenticated && user?.role === 'STUDENT') {
-    return (
-      <StudentLayout>
-        <Outlet />
-      </StudentLayout>
     );
   }
 
