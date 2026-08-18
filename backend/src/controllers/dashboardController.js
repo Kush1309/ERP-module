@@ -27,6 +27,26 @@ const getAdminDashboardMetrics = asyncHandler(async (req, res) => {
     });
 });
 
+/**
+ * @desc    Get dashboard metrics for student
+ * @route   GET /api/dashboard/student
+ * @access  Private/Student
+ */
+const getStudentDashboardMetrics = asyncHandler(async (req, res) => {
+    // Rely solely on authenticated user identity
+    const userId = req.user._id;
+
+    const metrics = await dashboardService.getStudentMetrics(userId);
+
+    res.status(200).json({
+        success: true,
+        message: 'Student dashboard metrics retrieved successfully',
+        data: metrics
+    });
+});
+
+
 module.exports = {
-    getAdminDashboardMetrics
+    getAdminDashboardMetrics,
+    getStudentDashboardMetrics
 };

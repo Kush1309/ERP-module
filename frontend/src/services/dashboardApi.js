@@ -8,3 +8,8 @@ export const getAdminDashboardStats = async (params = {}) => {
 
     return response.data?.data;
 };
+
+export const getStudentDashboardStats = async () => {
+    const response = await apiClient.get('/dashboard/student');
+    return response.data?.data;
+};

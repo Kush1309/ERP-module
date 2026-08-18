@@ -1,0 +1,6 @@
+[
+  {
+    "file": "dashboardRoutes.js",
+    "err": "Router.use() requires a middleware function"
+  }
+]

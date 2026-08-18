@@ -3,6 +3,7 @@ import { useAuth } from '../hooks/useAuth';
 import { ROLE_HOME } from '../constants/roles';
 import Button from '../components/Button';
 import AdminLayout from './AdminLayout';
+import ThemeToggle from '../components/ThemeToggle';
 
 function AppLayout() {
   const { isAuthenticated, user, logout, isLoading } = useAuth();
@@ -36,6 +37,7 @@ function AppLayout() {
           </Link>
 
           <nav className="flex items-center gap-4 text-sm font-medium text-ink-600">
+            <ThemeToggle />
             <Link to="/" className="transition-colors duration-200 hover:text-brand-700">
               Home
             </Link>

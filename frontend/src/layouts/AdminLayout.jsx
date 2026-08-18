@@ -1,6 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useState } from 'react';
+import ThemeToggle from '../components/ThemeToggle';
 
 const navigation = [
     { name: 'Dashboard', href: '/admin', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
@@ -60,8 +61,8 @@ export default function AdminLayout({ children }) {
                                     key={item.name}
                                     to={item.href !== '#' ? item.href : currentPath}
                                     className={`group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${isActive
-                                            ? 'bg-brand-600 text-white'
-                                            : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                                        ? 'bg-brand-600 text-white'
+                                        : 'text-slate-300 hover:bg-slate-800 hover:text-white'
                                         }`}
                                     onClick={() => setSidebarOpen(false)}
                                 >
@@ -85,11 +86,11 @@ export default function AdminLayout({ children }) {
             {/* Main layout */}
             <div className="flex flex-1 flex-col overflow-hidden">
                 {/* Top Header */}
-                <header className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 sm:px-6 lg:px-8 shadow-sm relative z-10">
+                <header className="flex h-16 shrink-0 items-center justify-between border-b border-ink-200 bg-white px-4 sm:px-6 lg:px-8 shadow-sm relative z-10 transition-colors duration-200">
                     <div className="flex items-center gap-4">
                         <button
                             type="button"
-                            className="lg:hidden text-slate-500 hover:text-slate-700"
+                            className="lg:hidden text-ink-500 hover:text-ink-700 dark:text-ink-400 dark:hover:text-ink-200"
                             onClick={() => setSidebarOpen(true)}
                         >
                             <span className="sr-only">Open sidebar</span>
@@ -97,14 +98,15 @@ export default function AdminLayout({ children }) {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                             </svg>
                         </button>
-                        <h1 className="text-xl font-semibold text-slate-800 hidden sm:block">School Management Dashboard</h1>
+                        <h1 className="text-xl font-semibold text-ink-900 hidden sm:block">School Management Dashboard</h1>
                     </div>
 
                     <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-3 pr-4 border-r border-slate-200">
+                        <ThemeToggle />
+                        <div className="flex items-center gap-3 pr-4 border-r border-ink-200">
                             <div className="flex flex-col items-end hidden sm:flex">
-                                <span className="text-sm font-medium text-slate-700">Welcome, {user?.loginId || 'Admin'}</span>
-                                <span className="text-xs text-slate-500">Administrator</span>
+                                <span className="text-sm font-medium text-ink-800">Welcome, {user?.loginId || 'Admin'}</span>
+                                <span className="text-xs text-ink-500">Administrator</span>
                             </div>
                             <div className="h-9 w-9 rounded-full bg-brand-100 flex items-center justify-center text-brand-700 font-bold border border-brand-200">
                                 {user?.loginId?.charAt(0).toUpperCase() || 'A'}
@@ -112,7 +114,7 @@ export default function AdminLayout({ children }) {
                         </div>
                         <button
                             onClick={logout}
-                            className="text-sm font-medium text-slate-600 hover:text-brand-600 transition-colors flex items-center gap-2"
+                            className="text-sm font-medium text-ink-600 hover:text-brand-600 dark:text-ink-300 dark:hover:text-brand-400 transition-colors flex items-center gap-2"
                         >
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />

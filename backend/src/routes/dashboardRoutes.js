@@ -1,12 +1,13 @@
 const express = require('express');
-const { getAdminDashboardMetrics } = require('../controllers/dashboardController');
-const { protect, authorize } = require('../middlewares/auth');
+const { getAdminDashboardMetrics, getStudentDashboardMetrics } = require('../controllers/dashboardController');
+const { authenticateUser, authorizeRoles } = require('../middlewares/auth');
 const { ROLES } = require('../constants/roles');
 
 const router = express.Router();
 
-router.use(protect);
+router.use(authenticateUser);
 
-router.get('/admin', authorize(ROLES.ADMIN), getAdminDashboardMetrics);
+router.get('/admin', authorizeRoles(ROLES.ADMIN), getAdminDashboardMetrics);
+router.get('/student', authorizeRoles(ROLES.STUDENT), getStudentDashboardMetrics);
 
 module.exports = router;

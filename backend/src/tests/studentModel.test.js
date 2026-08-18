@@ -62,7 +62,11 @@ describe('Student model foundation', () => {
 
   after(async () => {
     if (mongoAvailable) {
-      await Student.deleteMany({});
+      const testUsers = await User.find({ loginId: /TEST/ }).select('_id').lean();
+      const userIds = testUsers.map(u => u._id);
+      if (userIds.length > 0) {
+        await Student.deleteMany({ user: { $in: userIds } });
+      }
       await User.deleteMany({ loginId: /TEST/ });
       await mongoose.connection.close();
     }

@@ -3,6 +3,67 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --color-white: #ffffff;
+    --color-black: #000000;
+    
+    /* Brand Colors (remain mostly consistent, maybe slight tweaks) */
+    --color-brand-50: #eef6f4;
+    --color-brand-100: #d5eae4;
+    --color-brand-200: #abd4c9;
+    --color-brand-300: #79b8a8;
+    --color-brand-400: #4f9987;
+    --color-brand-500: #2f7a69;
+    --color-brand-600: #246155;
+    --color-brand-700: #1e4d44;
+    --color-brand-800: #1a3f39;
+    --color-brand-900: #163530;
+
+    /* Ink Colors (Light Mode) */
+    --color-ink-50: #f6f7f8;
+    --color-ink-100: #eceef0;
+    --color-ink-200: #d5dae0;
+    --color-ink-300: #b0b9c4;
+    --color-ink-400: #8593a3;
+    --color-ink-500: #667788;
+    --color-ink-600: #516070;
+    --color-ink-700: #434e5b;
+    --color-ink-800: #3a434d;
+    --color-ink-900: #1f262e;
+  }
+
+  .dark {
+    --color-white: #1f2937; /* Tailwind gray-800 */
+    --color-black: #ffffff;
+    
+    /* Brand Colors */
+    --color-brand-50: #163530;
+    --color-brand-100: #1a3f39;
+    --color-brand-200: #1e4d44;
+    --color-brand-300: #246155;
+    --color-brand-400: #2f7a69;
+    --color-brand-500: #4f9987;
+    --color-brand-600: #79b8a8;
+    --color-brand-700: #abd4c9;
+    --color-brand-800: #d5eae4;
+    --color-brand-900: #eef6f4;
+
+    /* Ink Colors (Inverted for Dark Mode) */
+    --color-ink-50: #111827; /* Tailwind gray-900, page background */
+    --color-ink-100: #1f2937; /* Tailwind gray-800 */
+    --color-ink-200: #374151; /* Tailwind gray-700 */
+    --color-ink-300: #4b5563; /* Tailwind gray-600 */
+    --color-ink-400: #6b7280; /* Tailwind gray-500 */
+    --color-ink-500: #9ca3af; /* Tailwind gray-400 */
+    --color-ink-600: #d1d5db; /* Tailwind gray-300 */
+    --color-ink-700: #e5e7eb; /* Tailwind gray-200 */
+    --color-ink-800: #f3f4f6; /* Tailwind gray-100 */
+    --color-ink-900: #f9fafb; /* Tailwind gray-50 */
+  }
+}
+
+
+@layer base {
   html {
     @apply scroll-smooth;
   }
