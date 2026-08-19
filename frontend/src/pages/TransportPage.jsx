@@ -61,7 +61,7 @@ function TransportPage() {
         setErrorRoutes('');
         try {
             const data = await getTransportRoutes({ limit: 1000 });
-            setRoutes(data?.data || []);
+            setRoutes(data?.data?.routes || []);
         } catch (err) {
             setErrorRoutes(err?.response?.data?.message || 'Unable to load transport information.');
         } finally {
@@ -74,7 +74,7 @@ function TransportPage() {
         setErrorAllocations('');
         try {
             const data = await getTransportAllocations({ limit: 1000 });
-            setAllocations(data?.data || []);
+            setAllocations(data?.data?.allocations || []);
         } catch (err) {
             setErrorAllocations(err?.response?.data?.message || 'Unable to load transport information.');
         } finally {
