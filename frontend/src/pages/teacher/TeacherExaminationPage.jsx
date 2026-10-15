@@ -42,7 +42,7 @@ export default function TeacherExaminationPage() {
             <div className="mb-6">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-600">Teacher workspace</p>
                 <h1 className="mt-2 font-display text-3xl font-semibold text-ink-900">Examinations & Marks</h1>
-                <p className="mt-2 text-sm text-ink-600">Manage result entry constraints inherently strictly within your exact authorized class mappings implicitly cleanly reliably securely.</p>
+                <p className="mt-2 text-sm text-ink-600">Enter and update marks for examinations of your assigned class and section.</p>
             </div>
 
             <Card className="overflow-hidden">
@@ -94,9 +94,14 @@ export default function TeacherExaminationPage() {
                                             </span>
                                         </td>
                                         <td className="px-4 py-3 text-sm text-right">
-                                            <Link to={`/teacher/examinations/${exam._id}/marks`} className="font-medium text-brand-600 hover:text-brand-800">
-                                                Manage Marks
-                                            </Link>
+                                            <div className="flex justify-end gap-4">
+                                                <Link to={`/teacher/examinations/${exam._id}/marks`} className="font-medium text-brand-600 hover:text-brand-800">
+                                                    Manage Marks
+                                                </Link>
+                                                <Link to={`/teacher/examinations/${exam._id}/analytics`} className="font-medium text-brand-600 hover:text-brand-800">
+                                                    Analytics
+                                                </Link>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}

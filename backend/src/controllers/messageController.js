@@ -12,6 +12,11 @@ const getConversations = asyncHandler(async (req, res) => {
     res.status(200).json({ success: true, data: result });
 });
 
+const getContacts = asyncHandler(async (req, res) => {
+    const contacts = await messageService.getContacts(req.user._id, { search: req.query.search });
+    res.status(200).json({ success: true, data: contacts });
+});
+
 const getConversationById = asyncHandler(async (req, res) => {
     const result = await messageService.getConversationById(req.user._id, req.params.id);
     res.status(200).json({ success: true, data: result });
@@ -20,7 +25,7 @@ const getConversationById = asyncHandler(async (req, res) => {
 const createConversation = asyncHandler(async (req, res) => {
     const { participantIds } = req.body;
     if (!participantIds || !Array.isArray(participantIds)) {
-        throw new AppError('Participant IDs must be provided via array natively dynamically', 400);
+        throw new AppError('participantIds must be an array of user IDs', 400);
     }
 
     // Natively pass ONLY safe values
@@ -46,6 +51,7 @@ const markMessageRead = asyncHandler(async (req, res) => {
 });
 
 module.exports = {
+    getContacts,
     getConversations,
     getConversationById,
     createConversation,

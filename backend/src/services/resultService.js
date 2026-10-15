@@ -12,23 +12,23 @@ exports.createResult = async (examId, data, userId) => {
     if (!student) throw new AppError('Student not found', 404);
 
     // Validate student applies to the specific class session mapping structurally 
-    if (exam.class !== student.class) {
-        throw new AppError('Student class does not match Exam class bounds', 400);
+    if (exam.class !== student.class || (exam.section && exam.section !== student.section)) {
+        throw new AppError('Student does not belong to the class/section of this exam', 400);
     }
 
     const subject = await Subject.findById(data.subject);
     if (!subject) throw new AppError('Subject not found', 404);
 
-    // Ensure unique index natively enforces deduplication natively mapping bounds safely 
-    data.exam = examId;
-    data.enteredBy = userId;
-    data.maximumMarks = subject.maximumMarks; // Force mapping to avoid payload manipulation directly 
-
-    const result = new Result(data);
-    // Status check to correctly use subject's individual passing properties gracefully mapped 
-    if (result.obtainedMarks < subject.passingMarks) {
-        result.status = 'FAIL';
-    }
+    const result = new Result({
+        exam: examId,
+        student: student._id,
+        subject: subject._id,
+        obtainedMarks: data.obtainedMarks,
+        // Always taken from the subject so the client cannot manipulate them
+        maximumMarks: subject.maximumMarks,
+        passingMarks: subject.passingMarks,
+        enteredBy: userId,
+    });
 
     await result.save();
     return result;
@@ -80,13 +80,16 @@ exports.updateResult = async (id, updateData) => {
     delete updateData.enteredBy;
 
     if (updateData.obtainedMarks !== undefined) {
-        result.obtainedMarks = updateData.obtainedMarks;
-        // Overriding save trigger mapping hooks
-        if (result.obtainedMarks < result.subject.passingMarks) {
-            result.status = 'FAIL';
-        } else {
-            result.status = 'PASS';
+        const marks = Number(updateData.obtainedMarks);
+        if (Number.isNaN(marks) || marks < 0) {
+            throw new AppError('Obtained marks must be a non-negative number', 400);
         }
+        result.obtainedMarks = marks;
+    }
+
+    if (result.subject) {
+        result.maximumMarks = result.subject.maximumMarks;
+        result.passingMarks = result.subject.passingMarks;
     }
 
     await result.save();

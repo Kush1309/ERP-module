@@ -5,6 +5,15 @@ const Teacher = require('../models/Teacher');
 const ParentProfile = require('../models/ParentProfile');
 const AppError = require('../utils/AppError');
 const mongoose = require('mongoose');
+const { runInTransaction } = require('../utils/transaction');
+const { getSettings } = require('./settingsService');
+const { notifyUsers } = require('./notificationService');
+
+// Administrators and librarians run the library desk
+const LIBRARY_STAFF = ['ADMIN', 'LIBRARIAN'];
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+const overdueDays = (dueDate, returnedAt = new Date()) => Math.max(Math.floor((returnedAt - new Date(dueDate)) / DAY_MS), 0);
 
 /**
  * Helper to validate ObjectId
@@ -32,7 +41,7 @@ class LibraryService {
      * Creates a new Book (Admin Only)
      */
     async createBook(data, currentUser) {
-        if (currentUser.role !== 'ADMIN') {
+        if (!LIBRARY_STAFF.includes(currentUser.role)) {
             throw new AppError('Unauthorized: Only administrators can create books', 403);
         }
 
@@ -126,7 +135,7 @@ class LibraryService {
      * Updates an existing book (Admin only)
      */
     async updateBook(bookId, data, currentUser) {
-        if (currentUser.role !== 'ADMIN') {
+        if (!LIBRARY_STAFF.includes(currentUser.role)) {
             throw new AppError('Unauthorized: Only administrators can update books', 403);
         }
 
@@ -179,7 +188,7 @@ class LibraryService {
      * Delete an existing book (Admin only)
      */
     async deleteBook(bookId, currentUser) {
-        if (currentUser.role !== 'ADMIN') {
+        if (!LIBRARY_STAFF.includes(currentUser.role)) {
             throw new AppError('Unauthorized: Only administrators can delete books', 403);
         }
 
@@ -210,7 +219,7 @@ class LibraryService {
      * Forces the creation of a new Issue ticket (Admin ONLY currently)
      */
     async createIssue(data, currentUser) {
-        if (currentUser.role !== 'ADMIN') {
+        if (!LIBRARY_STAFF.includes(currentUser.role)) {
             throw new AppError('Unauthorized: Only administrators can issue books', 403);
         }
 
@@ -244,6 +253,15 @@ class LibraryService {
         const issueDate = new Date();
         const parsedDueDate = new Date(dueDate);
 
+        if (!dueDate || Number.isNaN(parsedDueDate.getTime())) {
+            throw new AppError('A valid due date is required', 400);
+        }
+
+        // A date-only value (YYYY-MM-DD from a date picker) means "by the end of that day"
+        if (typeof dueDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dueDate)) {
+            parsedDueDate.setUTCHours(23, 59, 59, 999);
+        }
+
         if (parsedDueDate < issueDate) {
             throw new AppError('Due date cannot precede the issue date', 400);
         }
@@ -259,13 +277,14 @@ class LibraryService {
             throw new AppError('Requester already has an active issue for this book', 409);
         }
 
-        const session = await mongoose.startSession();
-        let newIssue;
+        const settings = await getSettings();
+        const activeCount = await BookIssue.countDocuments({ requesterId, requesterModel, status: { $in: ['ISSUED', 'OVERDUE'] } });
+        if (activeCount >= settings.libraryMaxActiveIssues) {
+            throw new AppError(`Borrowing limit reached: at most ${settings.libraryMaxActiveIssues} book(s) can be borrowed at a time`, 409);
+        }
 
-        try {
-            session.startTransaction();
-
-            // Atomic decrementation securing racing edge cases mapped identically within transaction boundary
+        const newIssue = await runInTransaction(async (session) => {
+            // Atomic decrement guards against two issues racing for the last copy
             const updatedBook = await Book.findOneAndUpdate(
                 { _id: bookId, availableCopies: { $gt: 0 } },
                 { $inc: { availableCopies: -1 } },
@@ -273,29 +292,27 @@ class LibraryService {
             );
 
             if (!updatedBook) {
-                throw new AppError('Race condition: Book copy became unavailable during execution', 409);
+                throw new AppError('This book copy just became unavailable. Please try again.', 409);
             }
 
-            const issueData = new BookIssue({
-                bookId,
-                requesterId,
-                requesterModel,
-                issueDate,
-                dueDate: parsedDueDate,
-                status: 'ISSUED'
-            });
-
-            [newIssue] = await BookIssue.create([issueData], { session });
-
-            await session.commitTransaction();
-        } catch (error) {
-            await session.abortTransaction();
-            // Re-throw handled AppErrors smoothly
-            if (error instanceof AppError) throw error;
-            throw new AppError('Library transaction failed internally', 500);
-        } finally {
-            session.endSession();
-        }
+            try {
+                const [issue] = await BookIssue.create([{
+                    bookId,
+                    requesterId,
+                    requesterModel,
+                    issueDate,
+                    dueDate: parsedDueDate,
+                    status: 'ISSUED'
+                }], { session });
+                return issue;
+            } catch (error) {
+                if (!session) {
+                    // Restore the copy when we cannot rely on a transaction rollback
+                    await Book.updateOne({ _id: bookId }, { $inc: { availableCopies: 1 } });
+                }
+                throw error;
+            }
+        });
 
         return newIssue;
     }
@@ -304,19 +321,28 @@ class LibraryService {
      * Lists active or historical Book Issues
      */
     async getIssues(params, currentUser) {
+        await this.refreshOverdue();
         const query = {};
 
         // Security boundary
-        if (currentUser.role === 'ADMIN') {
+        if (LIBRARY_STAFF.includes(currentUser.role)) {
             // Global scope
         } else if (currentUser.role === 'TEACHER') {
-            query.requesterId = currentUser.teacherId;
+            const teacher = await Teacher.findOne({ user: currentUser._id }).select('_id').lean();
+            if (!teacher) {
+                return { data: [], pagination: { total: 0, page: 1, limit: 10, totalPages: 0 } };
+            }
+            query.requesterId = teacher._id;
             query.requesterModel = 'Teacher';
         } else if (currentUser.role === 'STUDENT') {
-            query.requesterId = currentUser.studentId;
+            const student = await Student.findOne({ user: currentUser._id }).select('_id').lean();
+            if (!student) {
+                return { data: [], pagination: { total: 0, page: 1, limit: 10, totalPages: 0 } };
+            }
+            query.requesterId = student._id;
             query.requesterModel = 'Student';
         } else if (currentUser.role === 'PARENT') {
-            const parent = await ParentProfile.findOne({ userId: currentUser._id }).lean();
+            const parent = await ParentProfile.findOne({ user: currentUser._id }).lean();
             if (!parent || !parent.students || parent.students.length === 0) {
                 return { data: [], pagination: { total: 0, page: 1, limit: 10, totalPages: 0 } };
             }
@@ -327,7 +353,7 @@ class LibraryService {
         }
 
         // Scope constraints for user parameters (Admin can query specifically)
-        if (currentUser.role === 'ADMIN' && params.requesterId) {
+        if (LIBRARY_STAFF.includes(currentUser.role) && params.requesterId) {
             validateObjectId(params.requesterId);
             query.requesterId = params.requesterId;
         }
@@ -338,7 +364,10 @@ class LibraryService {
         }
 
         if (params.status) {
-            query.status = params.status;
+            query.status = String(params.status).toUpperCase();
+        }
+        if (params.fineStatus) {
+            query.fineStatus = String(params.fineStatus).toUpperCase();
         }
 
         const page = Math.max(1, parseInt(params.page, 10) || 1);
@@ -371,57 +400,142 @@ class LibraryService {
      * Accessible by Admins ONLY implicitly currently
      */
     async returnBook(issueId, currentUser) {
-        if (currentUser.role !== 'ADMIN') {
+        if (!LIBRARY_STAFF.includes(currentUser.role)) {
             throw new AppError('Unauthorized: Only administrators can process book returns', 403);
         }
 
         validateObjectId(issueId, 'Issue ID');
 
-        const session = await mongoose.startSession();
-        let returningIssue;
-
-        try {
-            session.startTransaction();
-
-            returningIssue = await BookIssue.findById(issueId).session(session);
-
-            if (!returningIssue) {
-                throw new AppError('Book Issue ticket not found', 404);
-            }
-
-            if (returningIssue.status === 'RETURNED') {
-                throw new AppError('This issue log is already closed/returned', 409);
-            }
-
-            const bookId = returningIssue.bookId;
-
-            // Increment atomic availability ensuring it doesn't break limits
-            const updatedBook = await Book.findOneAndUpdate(
-                { _id: bookId, $expr: { $lt: ["$availableCopies", "$totalCopies"] } },
-                { $inc: { availableCopies: 1 } },
+        const returningIssue = await runInTransaction(async (session) => {
+            // Atomically flip the issue to RETURNED so a double click cannot return twice
+            const issue = await BookIssue.findOneAndUpdate(
+                { _id: issueId, status: { $ne: 'RETURNED' } },
+                { $set: { status: 'RETURNED', returnDate: new Date() } },
                 { new: true, session }
             );
 
-            // Failsafe. If the book was somehow manually mutated breaking bounds, or removed
-            if (!updatedBook) {
-                throw new AppError('Inventory constraint blocked return processing', 409);
+            if (!issue) {
+                const exists = await BookIssue.exists({ _id: issueId }).session(session);
+                if (!exists) {
+                    throw new AppError('Book Issue ticket not found', 404);
+                }
+                throw new AppError('This issue log is already closed/returned', 409);
             }
 
-            returningIssue.status = 'RETURNED';
-            returningIssue.returnDate = new Date();
+            // Late-return fine from the configured library policy
+            const settings = await getSettings();
+            const daysLate = overdueDays(issue.dueDate, issue.returnDate);
+            const fine = Math.round(daysLate * (settings.libraryFinePerDay || 0) * 100) / 100;
+            if (fine > 0) {
+                // Targeted update: the status flip above has already happened, so a full
+                // document re-validation must not be able to abort the return half-way
+                await BookIssue.updateOne({ _id: issue._id }, { $set: { fineAmount: fine, fineStatus: 'PENDING' } }, { session });
+                issue.fineAmount = fine;
+                issue.fineStatus = 'PENDING';
+            }
 
-            await returningIssue.save({ session });
+            const book = await Book.findById(issue.bookId).session(session);
+            if (book && book.availableCopies < book.totalCopies) {
+                book.availableCopies += 1;
+                await book.save({ session });
+            }
 
-            await session.commitTransaction();
-        } catch (error) {
-            await session.abortTransaction();
-            if (error instanceof AppError) throw error;
-            throw new AppError('Failed processing the book return log', 500);
-        } finally {
-            session.endSession();
-        }
+            return issue;
+        });
 
         return returningIssue;
+    }
+
+
+    /**
+     * Flags issued books past their due date as OVERDUE and notifies borrowers once.
+     */
+    async refreshOverdue() {
+        const now = new Date();
+        const newlyOverdue = await BookIssue.find({ status: 'ISSUED', dueDate: { $lt: now } })
+            .populate('bookId', 'title')
+            .lean();
+        if (!newlyOverdue.length) return 0;
+        await BookIssue.updateMany({ _id: { $in: newlyOverdue.map((i) => i._id) } }, { $set: { status: 'OVERDUE' } });
+
+        const studentIds = newlyOverdue.filter((i) => i.requesterModel === 'Student').map((i) => i.requesterId);
+        const teacherIds = newlyOverdue.filter((i) => i.requesterModel === 'Teacher').map((i) => i.requesterId);
+        const [students, teachers] = await Promise.all([
+            Student.find({ _id: { $in: studentIds } }).select('user').lean(),
+            Teacher.find({ _id: { $in: teacherIds } }).select('user').lean(),
+        ]);
+        const userByProfile = new Map([...students, ...teachers].map((p) => [String(p._id), p.user]));
+        for (const issue of newlyOverdue) {
+            const userId = userByProfile.get(String(issue.requesterId));
+            if (userId) {
+                notifyUsers([userId], {
+                    type: 'LIBRARY',
+                    title: `Library book overdue: ${issue.bookId?.title || 'book'}`,
+                    message: `It was due on ${new Date(issue.dueDate).toISOString().slice(0, 10)}. Please return it to the library.`,
+                    link: '/library',
+                });
+            }
+        }
+        return newlyOverdue.length;
+    }
+
+    /**
+     * Records a fine as paid or waived (library staff only).
+     */
+    async settleFine(issueId, action, currentUser) {
+        if (!LIBRARY_STAFF.includes(currentUser.role)) {
+            throw new AppError('Only library staff can settle fines', 403);
+        }
+        validateObjectId(issueId, 'Issue ID');
+        if (!['PAID', 'WAIVED'].includes(action)) throw new AppError('action must be PAID or WAIVED', 400);
+        const issue = await BookIssue.findById(issueId);
+        if (!issue) throw new AppError('Book Issue ticket not found', 404);
+        if (issue.fineStatus !== 'PENDING') throw new AppError('There is no pending fine on this issue', 409);
+        issue.fineStatus = action;
+        await issue.save();
+        return issue;
+    }
+
+    /**
+     * Library summary report for staff.
+     */
+    async getReport(currentUser) {
+        if (!LIBRARY_STAFF.includes(currentUser.role)) {
+            throw new AppError('Only library staff can view library reports', 403);
+        }
+        await this.refreshOverdue();
+        const [books, issues] = await Promise.all([
+            Book.find().select('category totalCopies availableCopies').lean(),
+            BookIssue.find().populate('bookId', 'title author').lean(),
+        ]);
+        const byCategory = new Map();
+        books.forEach((b) => {
+            const c = byCategory.get(b.category) || { category: b.category, titles: 0, copies: 0, available: 0 };
+            c.titles += 1; c.copies += b.totalCopies; c.available += b.availableCopies;
+            byCategory.set(b.category, c);
+        });
+        const popularity = new Map();
+        issues.forEach((i) => {
+            if (!i.bookId) return;
+            const key = String(i.bookId._id);
+            const p = popularity.get(key) || { title: i.bookId.title, author: i.bookId.author, issues: 0 };
+            p.issues += 1;
+            popularity.set(key, p);
+        });
+        const sum = (arr, fn) => arr.reduce((acc, x) => acc + fn(x), 0);
+        return {
+            totals: {
+                titles: books.length,
+                copies: sum(books, (b) => b.totalCopies),
+                available: sum(books, (b) => b.availableCopies),
+                activeIssues: issues.filter((i) => i.status !== 'RETURNED').length,
+                overdue: issues.filter((i) => i.status === 'OVERDUE').length,
+                finesPending: Math.round(sum(issues.filter((i) => i.fineStatus === 'PENDING'), (i) => i.fineAmount) * 100) / 100,
+                finesCollected: Math.round(sum(issues.filter((i) => i.fineStatus === 'PAID'), (i) => i.fineAmount) * 100) / 100,
+            },
+            byCategory: [...byCategory.values()].sort((a, b) => a.category.localeCompare(b.category)),
+            mostIssued: [...popularity.values()].sort((a, b) => b.issues - a.issues).slice(0, 10),
+        };
     }
 
 }

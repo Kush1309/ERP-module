@@ -42,6 +42,7 @@ const userSchema = new mongoose.Schema(
 
 userSchema.methods.toSafeObject = function toSafeObject() {
   return {
+    id: this._id.toString(),
     loginId: this.loginId,
     role: this.role,
     isActive: this.isActive,

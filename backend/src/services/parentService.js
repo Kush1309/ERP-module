@@ -20,7 +20,7 @@ const verifyParentIdentity = async (userId) => {
     const user = await User.findById(userId);
 
     if (!user || user.role !== ROLES.PARENT) {
-        throw new AppError('Unauthorized: Access designated strictly securely to PARENT profiles.', 403);
+        throw new AppError('Only parent accounts can access this resource.', 403);
     }
     return true;
 };
@@ -33,7 +33,7 @@ const getParentProfile = async (userId) => {
 
     const profile = await ParentProfile.findOne({ user: userId });
     if (!profile) {
-        throw new AppError('Profile not discovered for parent payload', 404);
+        throw new AppError('Parent profile not found. Please contact the school administrator.', 404);
     }
 
     return profile;
@@ -63,7 +63,7 @@ const getLinkedStudents = async (userId) => {
  * Completely nullifies blind identity tampering effectively isolating strictly.
  */
 const getLinkedStudentById = async (userId, studentId) => {
-    validateObjectId(studentId, 'Invalid Student ID provided securely');
+    validateObjectId(studentId, 'Invalid student ID');
 
     const profile = await getParentProfile(userId);
 
@@ -72,13 +72,13 @@ const getLinkedStudentById = async (userId, studentId) => {
     );
 
     if (!isLinked) {
-        throw new AppError('Unauthorized: Specified identity not explicitly securely linked logically', 403);
+        throw new AppError('You can only view students linked to your account.', 403);
     }
 
     const student = await Student.findById(studentId).select('-createdAt -updatedAt -__v').lean();
 
     if (!student) {
-        throw new AppError('Student explicitly not discovered natively', 404);
+        throw new AppError('Student not found', 404);
     }
 
     return student;

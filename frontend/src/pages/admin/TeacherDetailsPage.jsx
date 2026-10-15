@@ -97,7 +97,7 @@ function TeacherDetailsPage() {
     }
 
     const {
-        firstName, lastName, email, phone, assignedClass, assignedSection, user
+        firstName, lastName, email, phone, assignedClass, assignedSection, department, designation, joiningDate, user
     } = teacher;
 
     const { loginId, isActive: accountActive } = user || {};
@@ -159,6 +159,18 @@ function TeacherDetailsPage() {
                         <div>
                             <span className="block text-xs font-medium uppercase tracking-wider text-ink-500">Assigned Section</span>
                             <span className="mt-1 block text-sm text-ink-900">{assignedSection || '-'}</span>
+                        </div>
+                        <div>
+                            <span className="block text-xs font-medium uppercase tracking-wider text-ink-500">Department</span>
+                            <span className="mt-1 block text-sm text-ink-900">{department || '-'}</span>
+                        </div>
+                        <div>
+                            <span className="block text-xs font-medium uppercase tracking-wider text-ink-500">Designation</span>
+                            <span className="mt-1 block text-sm text-ink-900">{designation || '-'}</span>
+                        </div>
+                        <div>
+                            <span className="block text-xs font-medium uppercase tracking-wider text-ink-500">Joining Date</span>
+                            <span className="mt-1 block text-sm text-ink-900">{joiningDate ? new Date(joiningDate).toLocaleDateString() : '-'}</span>
                         </div>
                     </div>
                 </Card>

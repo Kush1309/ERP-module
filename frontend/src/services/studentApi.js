@@ -62,6 +62,11 @@ export const exportAdminStudents = async (params = {}) => {
 export const importStudents = async (file) => {
     const formData = new FormData();
     formData.append('file', file);
-    const response = await apiClient.post('/students/admin/import', formData);
+    // The shared client defaults to JSON; axios would otherwise serialise the
+    // FormData to JSON. Declaring multipart lets the browser add the boundary.
+    const response = await apiClient.post('/students/admin/import', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 60000,
+    });
     return response.data;
 };

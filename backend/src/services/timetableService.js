@@ -122,6 +122,7 @@ const createTimetable = async (data) => {
     }
 
     await checkConflicts(data);
+    await require('./subjectAllocationService').assertTimetableMatchesAllocation(data);
 
     const timetable = await Timetable.create(data);
     return timetable;
@@ -232,6 +233,7 @@ const updateTimetable = async (id, data) => {
     }
 
     await checkConflicts(mergedData, id);
+    await require('./subjectAllocationService').assertTimetableMatchesAllocation(mergedData);
 
     const updated = await Timetable.findByIdAndUpdate(
         id,

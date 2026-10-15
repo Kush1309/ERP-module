@@ -1,8 +1,11 @@
 const express = require('express');
-const { getHealth } = require('../controllers/healthController');
-
 const router = express.Router();
 
-router.get('/', getHealth);
+router.get('/', (req, res) => {
+  res.json({
+    success: true,
+    message: 'School ERP API is running',
+  });
+});
 
 module.exports = router;

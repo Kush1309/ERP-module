@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import Card from '../../components/Card';
 import { parentApi } from '../../services/parentApi';
 
@@ -44,6 +44,13 @@ function ParentResultsPage() {
             ) : results.length === 0 ? (
                 <Card className="p-8"><p className="text-ink-600">No examination results found.</p></Card>
             ) : (
+                <>
+                <Card className="mb-4 flex flex-wrap items-center gap-3 p-4">
+                    <span className="text-sm font-medium text-ink-700">Report cards:</span>
+                    {[...new Map(results.filter((r) => r.exam?._id).map((r) => [r.exam._id, r.exam])).values()].map((exam) => (
+                        <Link key={exam._id} to={`/report-card/${exam._id}/${id}`} className="rounded-md border border-ink-200 px-3 py-1.5 text-sm font-medium text-brand-700 hover:bg-ink-50">{exam.name}</Link>
+                    ))}
+                </Card>
                 <Card className="overflow-hidden">
                     <div className="overflow-x-auto">
                         <table className="min-w-full divide-y divide-ink-200">
@@ -78,6 +85,7 @@ function ParentResultsPage() {
                         </table>
                     </div>
                 </Card>
+                </>
             )}
         </div>
     );

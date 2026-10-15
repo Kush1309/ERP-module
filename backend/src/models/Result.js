@@ -30,6 +30,10 @@ const resultSchema = new mongoose.Schema(
             required: true,
             min: 1,
         },
+        passingMarks: {
+            type: Number,
+            min: 0,
+        },
         percentage: {
             type: Number,
         },
@@ -55,27 +59,31 @@ const resultSchema = new mongoose.Schema(
 
 resultSchema.index({ exam: 1, student: 1, subject: 1 }, { unique: true });
 
-resultSchema.pre('save', async function (next) {
-    if (this.obtainedMarks > this.maximumMarks) {
-        this.invalidate('obtainedMarks', 'Obtained marks cannot exceed maximum marks.');
+// Marks validation must run during validation (invalidate() inside a save hook
+// is too late and the document would still be written).
+resultSchema.pre('validate', function () {
+    if (typeof this.obtainedMarks === 'number' && typeof this.maximumMarks === 'number' && this.obtainedMarks > this.maximumMarks) {
+        this.invalidate('obtainedMarks', `Obtained marks cannot exceed maximum marks (${this.maximumMarks}).`);
     }
+});
 
-    // Deterministically compute Grade details ensuring Math consistency natively.
+resultSchema.pre('save', async function () {
+    // Deterministically compute percentage and grade on the server,
+    // using the school's configured grading scale (Settings → Grading).
     this.percentage = Number(((this.obtainedMarks / this.maximumMarks) * 100).toFixed(2));
 
-    if (this.percentage >= 90) this.grade = 'A+';
-    else if (this.percentage >= 80) this.grade = 'A';
-    else if (this.percentage >= 70) this.grade = 'B+';
-    else if (this.percentage >= 60) this.grade = 'B';
-    else if (this.percentage >= 50) this.grade = 'C';
-    else if (this.percentage >= 40) this.grade = 'D';
-    else this.grade = 'F';
+    const { getGradeScale } = require('../services/settingsService');
+    const { bandFor } = require('../utils/grading');
+    const band = bandFor(this.percentage, await getGradeScale());
+    this.grade = band.grade;
 
-    // In real projects, pass/fail may map uniquely relative to Subject specific passingMarks.
-    // For safety natively against the schema values:
-    this.status = this.grade === 'F' ? 'FAIL' : 'PASS';
-
-    next();
+    // PASS/FAIL follows the subject's own passing marks when known
+    // (stored on the result), otherwise falls back to the grade's fail flag.
+    if (typeof this.passingMarks === 'number') {
+        this.status = this.obtainedMarks >= this.passingMarks ? 'PASS' : 'FAIL';
+    } else {
+        this.status = band.isFail ? 'FAIL' : 'PASS';
+    }
 });
 
 const Result = mongoose.model('Result', resultSchema);

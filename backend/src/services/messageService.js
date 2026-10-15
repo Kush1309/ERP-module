@@ -5,6 +5,7 @@ const User = require('../models/User');
 const Teacher = require('../models/Teacher');
 const Student = require('../models/Student');
 const ParentProfile = require('../models/ParentProfile');
+const StaffProfile = require('../models/StaffProfile');
 const AppError = require('../utils/AppError');
 
 const { isValidObjectId } = mongoose;
@@ -13,6 +14,130 @@ const validateObjectId = (id, message = 'Invalid ObjectId provided') => {
     if (!id || !isValidObjectId(id)) {
         throw new AppError(message, 400);
     }
+};
+
+/**
+ * Users do not carry names themselves (names live on Student/Teacher/Parent
+ * profiles), so build a display map for a set of user ids.
+ */
+const buildUserDirectory = async (userIds) => {
+    const ids = [...new Set((userIds || []).map(String))].filter(isValidObjectId);
+    if (ids.length === 0) return new Map();
+
+    const [users, students, teachers, parents, staffProfiles] = await Promise.all([
+        User.find({ _id: { $in: ids } }).select('loginId role isActive').lean(),
+        Student.find({ user: { $in: ids } }).select('user firstName lastName class section').lean(),
+        Teacher.find({ user: { $in: ids } }).select('user firstName lastName assignedClass assignedSection').lean(),
+        ParentProfile.find({ user: { $in: ids } }).select('user firstName lastName').lean(),
+        StaffProfile.find({ user: { $in: ids } }).select('user firstName lastName designation').lean(),
+    ]);
+
+    const profileByUser = new Map();
+    students.forEach((p) => profileByUser.set(String(p.user), {
+        name: `${p.firstName} ${p.lastName}`.trim(),
+        detail: `Student · Class ${p.class}-${p.section}`,
+    }));
+    teachers.forEach((p) => profileByUser.set(String(p.user), {
+        name: `${p.firstName} ${p.lastName}`.trim(),
+        detail: `Teacher · Class ${p.assignedClass}-${p.assignedSection}`,
+    }));
+    parents.forEach((p) => profileByUser.set(String(p.user), {
+        name: `${p.firstName || ''} ${p.lastName || ''}`.trim(),
+        detail: 'Parent',
+    }));
+    staffProfiles.forEach((p) => profileByUser.set(String(p.user), {
+        name: `${p.firstName} ${p.lastName}`.trim(),
+        detail: p.designation || 'Staff',
+    }));
+
+    const directory = new Map();
+    users.forEach((u) => {
+        const profile = profileByUser.get(String(u._id)) || {};
+        const fallbackName = u.role === 'ADMIN' ? 'Administrator' : u.loginId;
+        directory.set(String(u._id), {
+            _id: u._id,
+            loginId: u.loginId,
+            role: u.role,
+            name: profile.name || fallbackName,
+            detail: profile.detail || (u.role === 'ADMIN' ? 'School Administration' : u.role),
+        });
+    });
+
+    return directory;
+};
+
+const decorateParticipants = (conversation, directory) => ({
+    ...conversation,
+    participants: (conversation.participants || []).map((p) => {
+        const id = String(p?._id || p);
+        return directory.get(id) || { _id: id, name: 'Unknown user', role: null, loginId: null };
+    }),
+});
+
+/**
+ * Lists the people the current user is allowed to start a conversation with,
+ * mirroring the rules enforced by canCommunicate().
+ */
+const getContacts = async (userId, query = {}) => {
+    validateObjectId(userId, 'Invalid authenticating user ID');
+    const me = await User.findById(userId).select('role').lean();
+    if (!me) throw new AppError('Authenticated user not found', 404);
+
+    const search = query.search ? String(query.search).trim().toLowerCase() : '';
+    const candidateUserIds = new Set();
+
+    const addUsers = (list) => list.forEach((id) => id && candidateUserIds.add(String(id)));
+
+    const admins = await User.find({ role: 'ADMIN', isActive: true }).distinct('_id');
+    addUsers(admins);
+
+    if (me.role === 'ADMIN') {
+        const others = await User.find({ role: { $in: ['TEACHER', 'STUDENT', 'PARENT', 'ACCOUNTANT', 'LIBRARIAN'] }, isActive: true }).distinct('_id');
+        addUsers(others);
+    } else if (me.role === 'TEACHER') {
+        const teacher = await Teacher.findOne({ user: userId }).lean();
+        if (teacher) {
+            const classStudents = await Student.find({ class: teacher.assignedClass, section: teacher.assignedSection }).select('_id user').lean();
+            addUsers(classStudents.map((s) => s.user));
+            const parentUsers = await ParentProfile.find({ students: { $in: classStudents.map((s) => s._id) } }).distinct('user');
+            addUsers(parentUsers);
+        }
+    } else if (me.role === 'STUDENT') {
+        const student = await Student.findOne({ user: userId }).lean();
+        if (student) {
+            const teachers = await Teacher.find({ assignedClass: student.class, assignedSection: student.section }).distinct('user');
+            addUsers(teachers);
+        }
+    } else if (me.role === 'PARENT') {
+        const parent = await ParentProfile.findOne({ user: userId }).lean();
+        if (parent && parent.students?.length) {
+            const children = await Student.find({ _id: { $in: parent.students } }).select('class section').lean();
+            if (children.length) {
+                const teachers = await Teacher.find({
+                    $or: children.map((c) => ({ assignedClass: c.class, assignedSection: c.section })),
+                }).distinct('user');
+                addUsers(teachers);
+            }
+        }
+    }
+
+    candidateUserIds.delete(String(userId));
+
+    // Only active accounts can be contacted
+    const activeIds = await User.find({ _id: { $in: [...candidateUserIds] }, isActive: true }).distinct('_id');
+    const directory = await buildUserDirectory(activeIds);
+
+    let contacts = [...directory.values()];
+    if (search) {
+        contacts = contacts.filter((c) =>
+            c.name.toLowerCase().includes(search) || (c.loginId || '').toLowerCase().includes(search)
+        );
+    }
+
+    const roleOrder = { ADMIN: 0, TEACHER: 1, ACCOUNTANT: 2, LIBRARIAN: 2, PARENT: 3, STUDENT: 4 };
+    contacts.sort((a, b) => (roleOrder[a.role] - roleOrder[b.role]) || a.name.localeCompare(b.name));
+
+    return contacts.slice(0, 200);
 };
 
 const extractUserRoleIdsSafe = (participants) => {
@@ -120,15 +245,16 @@ const getConversations = async (userId, query) => {
         .sort({ lastMessageAt: -1, createdAt: -1 })
         .skip(skip)
         .limit(limit)
-        .populate('participants', 'firstName lastName email role')
         .populate({
             path: 'lastMessage',
             select: 'content sender createdAt readBy'
         })
         .lean();
 
+    const directory = await buildUserDirectory(conversations.flatMap((c) => c.participants));
+
     return {
-        data: conversations,
+        data: conversations.map((c) => decorateParticipants(c, directory)),
         pagination: { total, page, limit, pages: Math.ceil(total / limit) }
     };
 };
@@ -140,9 +266,7 @@ const getConversationById = async (userId, conversationId) => {
     const conversation = await Conversation.findOne({
         _id: conversationId,
         participants: { $in: [userId] }
-    })
-        .populate('participants', 'firstName lastName email role')
-        .lean();
+    }).lean();
 
     if (!conversation) {
         throw new AppError('Conversation not found', 404);
@@ -152,8 +276,10 @@ const getConversationById = async (userId, conversationId) => {
         .sort({ createdAt: 1 })
         .lean();
 
-    conversation.messages = messages;
-    return conversation;
+    const directory = await buildUserDirectory(conversation.participants);
+    const decorated = decorateParticipants(conversation, directory);
+    decorated.messages = messages;
+    return decorated;
 };
 
 const sendMessage = async (userId, conversationId, content) => {
@@ -161,11 +287,11 @@ const sendMessage = async (userId, conversationId, content) => {
     validateObjectId(conversationId, 'Invalid conversation ID');
 
     if (!content || typeof content !== 'string') {
-        throw new AppError('Message content must be structured text', 400);
+        throw new AppError('Message content must be text', 400);
     }
     const safeContent = content.trim();
     if (safeContent.length === 0 || safeContent.length > 2000) {
-        throw new AppError('Message size invalid', 400);
+        throw new AppError('Message must be between 1 and 2000 characters', 400);
     }
 
     const conversation = await Conversation.findOne({
@@ -217,6 +343,7 @@ const markMessageRead = async (userId, messageId) => {
 };
 
 module.exports = {
+    getContacts,
     createConversation,
     getConversations,
     getConversationById,

@@ -31,6 +31,17 @@ const bookIssueSchema = new mongoose.Schema(
         returnDate: {
             type: Date
         },
+        // Late-return fine, calculated from the library policy in School Settings
+        fineAmount: {
+            type: Number,
+            min: 0,
+            default: 0
+        },
+        fineStatus: {
+            type: String,
+            enum: ['NONE', 'PENDING', 'PAID', 'WAIVED'],
+            default: 'NONE'
+        },
         status: {
             type: String,
             required: [true, 'Status is required'],

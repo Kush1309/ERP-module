@@ -60,7 +60,7 @@ function TransportPage() {
         setLoadingRoutes(true);
         setErrorRoutes('');
         try {
-            const data = await getTransportRoutes({ limit: 1000 });
+            const data = await getTransportRoutes({ limit: 100 });
             setRoutes(data?.data?.routes || []);
         } catch (err) {
             setErrorRoutes(err?.response?.data?.message || 'Unable to load transport information.');
@@ -70,22 +70,34 @@ function TransportPage() {
     }, []);
 
     const loadAllocations = useCallback(async () => {
+        // Allocations are only tracked for students (viewable by admin, students and parents)
+        if (user?.role === 'TEACHER') {
+            setAllocations([]);
+            setLoadingAllocations(false);
+            return;
+        }
         setLoadingAllocations(true);
         setErrorAllocations('');
         try {
-            const data = await getTransportAllocations({ limit: 1000 });
-            setAllocations(data?.data?.allocations || []);
+            const data = await getTransportAllocations({ limit: 100 });
+            // The API populates `studentId` / `routeId`; the page works with `student` / `route`
+            const normalised = (data?.data?.allocations || []).map((a) => ({
+                ...a,
+                student: a.student || a.studentId,
+                route: a.route || a.routeId,
+            }));
+            setAllocations(normalised);
         } catch (err) {
             setErrorAllocations(err?.response?.data?.message || 'Unable to load transport information.');
         } finally {
             setLoadingAllocations(false);
         }
-    }, []);
+    }, [user?.role]);
 
     const loadStudentsIfAdmin = useCallback(async () => {
         if (!isAdmin) return;
         try {
-            const data = await getStudents({ limit: 1000 });
+            const data = await getStudents({ limit: 100, status: 'ACTIVE' });
             setStudentsList(data?.students || []);
         } catch (err) {
             console.error('Failed to load students for dropdown', err);

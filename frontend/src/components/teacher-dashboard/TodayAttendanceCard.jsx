@@ -8,7 +8,7 @@ export default function TodayAttendanceCard({ attendance }) {
     const offset = isAvailable ? circumference - (attendance.percentage / 100) * circumference : circumference;
 
     return (
-        <div className="relative group rounded-[18px] border border-slate-100 bg-white shadow-[0_4px_20px_rgba(0,0,0,0.03)] p-6 transition-all duration-300 hover:-translate-y-1 h-[180px] flex flex-col justify-between">
+        <div className="relative group rounded-[18px] border border-slate-100 bg-white shadow-[0_4px_20px_rgba(0,0,0,0.03)] p-6 transition-all duration-300 hover:-translate-y-1 min-h-[180px] flex flex-col justify-between">
             <div className="flex justify-between items-start">
                 <div className="flex items-center gap-3">
                     <div className="relative w-16 h-16 transform group-hover:scale-105 transition-transform duration-500">
@@ -49,7 +49,8 @@ export default function TodayAttendanceCard({ attendance }) {
                 </div>
             </div>
 
-            <Link to="/teacher/attendance" className="absolute bottom-4 right-4 text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 group/link">
+            {/* In normal flow (not absolutely positioned) so it never overlaps the counts on narrow cards */}
+            <Link to="/teacher/attendance" className="mt-4 self-end text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1 group/link">
                 View Attendance <span className="group-hover/link:translate-x-1 transition-transform">→</span>
             </Link>
         </div>

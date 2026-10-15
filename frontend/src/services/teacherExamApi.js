@@ -10,14 +10,22 @@ export const getTeacherExamById = async (id) => {
     return response.data?.data?.exam;
 };
 
-// Uses the main results API but explicitly targeting the exam results list appropriately
+// Subjects catalogue available to teachers for marks entry (read-only)
+export const getTeacherSubjects = async () => {
+    const response = await apiClient.get('/teacher/exams/subjects');
+    return response.data?.data?.subjects || [];
+};
+
+// Active students of the teacher's own class/section for the given exam
+export const getTeacherExamStudents = async (examId) => {
+    const response = await apiClient.get(`/teacher/exams/${examId}/students`);
+    return response.data?.data?.students || [];
+};
+
+// Results already recorded for the teacher's students in this exam
 export const getTeacherExamResults = async (examId) => {
-    // A teacher can securely read results over the admin endpoint if protected correctly,
-    // OR we just use the existing one provided in examApi if it does not enforce ID boundaries on read.
-    // Assuming the user must fetch results for an exam.
-    // Actually, we'll build a specific call here just in case.
-    const response = await apiClient.get(`/exams/${examId}/results`);
-    return response.data?.data?.results;
+    const response = await apiClient.get(`/teacher/exams/${examId}/results`);
+    return response.data?.data?.results || [];
 };
 
 export const createTeacherResult = async (examId, resultData) => {

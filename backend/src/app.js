@@ -5,6 +5,8 @@ const morgan = require('morgan');
 const routes = require('./routes');
 const { notFound } = require('./middlewares/notFound');
 const { errorHandler } = require('./middlewares/errorHandler');
+const { sanitizeInput } = require('./middlewares/sanitizeInput');
+const { auditLog } = require('./middlewares/auditLog');
 
 const app = express();
 
@@ -16,8 +18,10 @@ app.use(
   })
 );
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+app.use(sanitizeInput);
+app.use(auditLog);
 
 app.use('/api', routes);
 

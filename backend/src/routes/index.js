@@ -34,6 +34,11 @@ const studentResultRoutes = require('./studentResultRoutes');
 const studentTimetableRoutes = require('./studentTimetableRoutes');
 const studentNoticeRoutes = require('./studentNoticeRoutes');
 router.use('/student/results', studentResultRoutes);
+
+const { authenticateUser, authorizeRoles } = require('../middlewares/auth');
+const { ROLES } = require('../constants/roles');
+const { getStudentExams } = require('../controllers/studentResultController');
+router.get('/student/exams', authenticateUser, authorizeRoles(ROLES.STUDENT), getStudentExams);
 router.use('/student/timetable', studentTimetableRoutes);
 router.use('/student/notices', studentNoticeRoutes);
 
@@ -47,6 +52,8 @@ const homeworkRoutes = require('./homeworkRoutes');
 router.use('/homework', homeworkRoutes);
 const leaveRoutes = require('./leaveRoutes');
 router.use('/leaves', leaveRoutes);
+const eventRoutes = require('./eventRoutes');
+router.use('/events', eventRoutes);
 const libraryRoutes = require('./libraryRoutes');
 router.use('/library', libraryRoutes);
 const parentRoutes = require('./parentRoutes');
@@ -64,10 +71,24 @@ router.use('/parent', parentTimetableRoutes);
 
 router.use('/fees', feeRoutes);
 
+const parentAdminRoutes = require('./parentAdminRoutes');
+router.use('/parents', parentAdminRoutes);
+
 const dashboardRoutes = require('./dashboardRoutes');
 router.use('/dashboard', dashboardRoutes);
 
 const transportRoutes = require('./transportRoutes');
 router.use('/transport', transportRoutes);
+
+router.use('/staff-attendance', require('./staffAttendanceRoutes'));
+router.use('/', require('./reportCardRoutes'));
+router.use('/admissions', require('./admissionRoutes'));
+const { hostelRouter, inventoryRouter } = require('./facilityRoutes');
+router.use('/hostel', hostelRouter);
+router.use('/inventory', inventoryRouter);
+router.use('/reports', require('./reportRoutes'));
+
+const adminConfigRoutes = require('./adminConfigRoutes');
+router.use('/', adminConfigRoutes);
 
 module.exports = router;

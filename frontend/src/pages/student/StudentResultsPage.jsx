@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import Card from '../../components/Card';
 import { getStudentResults } from '../../services/studentResultApi';
 
@@ -14,7 +15,7 @@ export default function StudentResultsPage() {
             const data = await getStudentResults();
             setResults(data);
         } catch {
-            setError('Failed to securely load your academic results.');
+            setError('Unable to load your academic results.');
         } finally {
             setLoading(false);
         }
@@ -33,6 +34,7 @@ export default function StudentResultsPage() {
             if (!groups[examId]) {
                 groups[examId] = {
                     metadata: res.exam,
+                    studentId: res.student?._id || res.student,
                     subjects: [],
                     totalObtained: 0,
                     totalMaximum: 0,
@@ -85,7 +87,7 @@ export default function StudentResultsPage() {
             <div className="mb-6">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-600">Student workspace</p>
                 <h1 className="mt-2 font-display text-3xl font-semibold text-ink-900">Academic Standing</h1>
-                <p className="mt-2 text-sm text-ink-600">Review your examination marks natively accurately appropriately robustly gracefully reliably organically explicitly neatly accurately stably securely confidently securely dependably correctly explicitly organically carefully gracefully successfully intelligently matching manually effortlessly accurately correctly seamlessly cleanly smoothly logically exactly stably precisely intelligently automatically precisely smoothly exactly implicitly securely identically natively smoothly matching harmoniously manually.</p>
+                <p className="mt-2 text-sm text-ink-600">Review your marks, grades and pass status for published examinations.</p>
             </div>
 
             <div className="space-y-8">
@@ -108,8 +110,11 @@ export default function StudentResultsPage() {
                                     </div>
                                     <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium 
                                         ${isPassed ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-red-200 bg-red-50 text-red-700'}`}>
-                                        {isPassed ? 'PASSED' : 'OUTSTANDING DEFICIENCY'}
+                                        {isPassed ? 'PASSED' : 'NOT PASSED'}
                                     </span>
+                                    {group.studentId && (
+                                        <Link to={`/report-card/${group.metadata._id}/${group.studentId}`} className="text-sm font-medium text-brand-700 hover:text-brand-800">Report card</Link>
+                                    )}
                                 </div>
                             </div>
                             <div className="overflow-x-auto">

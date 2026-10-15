@@ -8,7 +8,10 @@ router.use(authenticateUser);
 router.use(authorizeRoles(ROLES.TEACHER));
 
 router.get('/', teacherExamController.getTeacherExams);
+router.get('/subjects', teacherExamController.getTeacherSubjects);
 router.get('/:id', teacherExamController.getTeacherExamById);
+router.get('/:id/students', teacherExamController.getTeacherExamStudents);
+router.get('/:id/results', teacherExamController.getTeacherExamResults);
 router.post('/:examId/results', teacherExamController.createTeacherResult);
 router.put('/results/:resultId', teacherExamController.updateTeacherResult);
 

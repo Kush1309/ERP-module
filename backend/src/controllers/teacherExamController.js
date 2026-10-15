@@ -16,6 +16,77 @@ const getTeacherContext = async (userId) => {
     return teacher;
 };
 
+const isExamInTeacherScope = (exam, teacher) =>
+    exam.class === teacher.assignedClass && (!exam.section || exam.section === teacher.assignedSection);
+
+const loadScopedExam = async (examId, teacher) => {
+    if (!mongoose.Types.ObjectId.isValid(examId)) {
+        throw new AppError('Invalid Exam ID', 400);
+    }
+    const exam = await Exam.findById(examId);
+    if (!exam) {
+        throw new AppError('Exam not found', 404);
+    }
+    if (!isExamInTeacherScope(exam, teacher)) {
+        throw new AppError('You do not have authorization to access this examination', 403);
+    }
+    return exam;
+};
+
+// GET /api/teacher/exams/subjects - read-only subject catalogue for marks entry
+exports.getTeacherSubjects = asyncHandler(async (req, res) => {
+    await getTeacherContext(req.user.id);
+    const subjects = await Subject.find({}).sort({ name: 1 }).select('name code maximumMarks passingMarks').lean();
+
+    res.status(200).json({
+        status: 'success',
+        data: { subjects }
+    });
+});
+
+// GET /api/teacher/exams/:id/students - active students of the teacher's own class/section
+exports.getTeacherExamStudents = asyncHandler(async (req, res) => {
+    const teacher = await getTeacherContext(req.user.id);
+    await loadScopedExam(req.params.id, teacher);
+
+    const students = await Student.find({
+        class: teacher.assignedClass,
+        section: teacher.assignedSection,
+        status: 'ACTIVE'
+    })
+        .sort({ rollNumber: 1, firstName: 1 })
+        .select('studentId firstName lastName rollNumber class section')
+        .lean();
+
+    res.status(200).json({
+        status: 'success',
+        data: { students }
+    });
+});
+
+// GET /api/teacher/exams/:id/results - results of the teacher's own students for this exam
+exports.getTeacherExamResults = asyncHandler(async (req, res) => {
+    const teacher = await getTeacherContext(req.user.id);
+    const exam = await loadScopedExam(req.params.id, teacher);
+
+    const scopedStudentIds = await Student.find({
+        class: teacher.assignedClass,
+        section: teacher.assignedSection
+    }).distinct('_id');
+
+    const results = await Result.find({ exam: exam._id, student: { $in: scopedStudentIds } })
+        .sort({ createdAt: -1 })
+        .populate('student', 'studentId firstName lastName rollNumber')
+        .populate('subject', 'name code maximumMarks passingMarks')
+        .lean();
+
+    res.status(200).json({
+        status: 'success',
+        results: results.length,
+        data: { results }
+    });
+});
+
 exports.getTeacherExams = asyncHandler(async (req, res) => {
     const teacher = await getTeacherContext(req.user.id);
 
@@ -69,6 +140,10 @@ exports.createTeacherResult = asyncHandler(async (req, res) => {
         throw new AppError('You do not have authorization to modify results for this examination', 403);
     }
 
+    if (!mongoose.Types.ObjectId.isValid(req.body.student) || !mongoose.Types.ObjectId.isValid(req.body.subject)) {
+        throw new AppError('Valid student and subject are required', 400);
+    }
+
     const student = await Student.findById(req.body.student);
     if (!student) throw new AppError('Student not found', 404);
     if (student.class !== teacher.assignedClass || student.section !== teacher.assignedSection) {
@@ -89,12 +164,9 @@ exports.createTeacherResult = asyncHandler(async (req, res) => {
         subject: subject._id,
         obtainedMarks: obtainedMarks,
         maximumMarks: subject.maximumMarks,
+        passingMarks: subject.passingMarks,
         enteredBy: req.user.id
     });
-
-    if (result.obtainedMarks < subject.passingMarks) {
-        result.status = 'FAIL';
-    }
 
     await result.save();
 
@@ -127,12 +199,8 @@ exports.updateTeacherResult = asyncHandler(async (req, res) => {
     }
 
     result.obtainedMarks = obtainedMarks;
-
-    if (result.obtainedMarks < result.subject.passingMarks) {
-        result.status = 'FAIL';
-    } else {
-        result.status = 'PASS';
-    }
+    result.maximumMarks = result.subject.maximumMarks;
+    result.passingMarks = result.subject.passingMarks;
 
     await result.save();
 

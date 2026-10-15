@@ -5,6 +5,9 @@ import Button from '../components/Button';
 import AdminLayout from './AdminLayout';
 import StudentLayout from './StudentLayout';
 import TeacherLayout from './TeacherLayout';
+import ParentLayout from './ParentLayout';
+import AccountantLayout from './AccountantLayout';
+import LibrarianLayout from './LibrarianLayout';
 import ThemeToggle from '../components/ThemeToggle';
 
 function AppLayout() {
@@ -32,11 +35,32 @@ function AppLayout() {
         </TeacherLayout>
       );
     }
-    // Fallback for other logged in roles
+    if (user?.role === 'PARENT') {
+      return (
+        <ParentLayout>
+          <Outlet />
+        </ParentLayout>
+      );
+    }
+    if (user?.role === 'ACCOUNTANT') {
+      return (
+        <AccountantLayout>
+          <Outlet />
+        </AccountantLayout>
+      );
+    }
+    if (user?.role === 'LIBRARIAN') {
+      return (
+        <LibrarianLayout>
+          <Outlet />
+        </LibrarianLayout>
+      );
+    }
+    // Unknown role: never fall back to the administrator navigation
     return (
-      <AdminLayout>
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 p-6">
         <Outlet />
-      </AdminLayout>
+      </div>
     );
   }
 
@@ -95,7 +119,7 @@ function AppLayout() {
         </main>
 
         <footer className="border-t border-ink-200/80 pt-5 text-sm text-ink-500">
-          School ERP foundation — Module 2 authentication ready.
+          © {new Date().getFullYear()} School ERP — Campus operations.
         </footer>
       </div>
     </div>

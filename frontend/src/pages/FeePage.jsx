@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
     listFeeStructures,
@@ -12,17 +13,30 @@ import {
 } from '../services/feeApi';
 import Modal from '../components/Modal';
 import Button from '../components/Button';
+import StudentPicker from '../components/common/StudentPicker';
+import FinanceSummary from '../components/fees/FinanceSummary';
+import { financeApi } from '../services/moduleApi';
+
+const PAYMENT_METHODS = ['CASH', 'UPI', 'BANK_TRANSFER', 'CHEQUE', 'CARD', 'OTHER'];
+const methodLabel = (m) => String(m || '').toLowerCase().split('_').map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join(' ');
+const netDue = (record) => Math.max((record?.amountDue || 0) - (record?.discount || 0), 0);
+
+// Same rupee formatting as the admin dashboard
+const formatCurrency = (value) =>
+    `₹${Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
 
 function FeePage() {
     const { user } = useAuth();
 
     // RBAC permissions
     const isAdmin = user?.role === 'ADMIN';
+    // Accountants manage fees like administrators, except approving concessions
+    const isFinance = isAdmin || user?.role === 'ACCOUNTANT';
     const isTeacher = user?.role === 'TEACHER';
     const isStudentOrParent = user?.role === 'STUDENT' || user?.role === 'PARENT';
 
     // Determine default tab based on role
-    const initialTab = (isAdmin || isTeacher) ? 'structures' : 'records';
+    const initialTab = (isFinance || isTeacher) ? 'structures' : 'records';
     const [activeTab, setActiveTab] = useState(initialTab);
 
     const [structures, setStructures] = useState([]);
@@ -62,6 +76,15 @@ function FeePage() {
         amountDue: ''
     });
     const [paymentAmount, setPaymentAmount] = useState('');
+    const [paymentDetails, setPaymentDetails] = useState({ method: 'CASH', reference: '', note: '' });
+    const [notice, setNotice] = useState('');
+    const [discountRecord, setDiscountRecord] = useState(null);
+    const [discountForm, setDiscountForm] = useState({ discount: '', reason: '' });
+    const [historyRecord, setHistoryRecord] = useState(null);
+    const [modalError, setModalError] = useState(null);
+    const [recordStudent, setRecordStudent] = useState(null);
+    const [filterStudent, setFilterStudent] = useState(null);
+    const [structureOptions, setStructureOptions] = useState([]);
 
     const fetchStructures = async () => {
         try {
@@ -72,7 +95,7 @@ function FeePage() {
             if (academicYear) params.academicYear = academicYear;
             if (statusFilter) params.status = statusFilter;
 
-            const data = await listFeeStructures(params);
+            const data = await listFeeStructures({ ...params, limit: 100 });
             setStructures(data.data || []);
         } catch (err) {
             setError(err.response?.data?.message || 'Failed to fetch fee structures');
@@ -89,7 +112,7 @@ function FeePage() {
             if (studentId) params.studentId = studentId;
             if (statusFilter) params.status = statusFilter;
 
-            const data = await listFeeRecords(params);
+            const data = await listFeeRecords({ ...params, limit: 100 });
             setRecords(data.data || []);
         } catch (err) {
             setError(err.response?.data?.message || 'Failed to fetch fee records');
@@ -99,7 +122,7 @@ function FeePage() {
     };
 
     useEffect(() => {
-        if (activeTab === 'structures' && (isAdmin || isTeacher)) {
+        if (activeTab === 'structures' && (isFinance || isTeacher)) {
             fetchStructures();
         } else if (activeTab === 'records') {
             fetchRecords();
@@ -108,7 +131,8 @@ function FeePage() {
 
     // Structure Handlers
     const openStructureModal = (st = null) => {
-        if (!isAdmin) return;
+        if (!isFinance) return;
+        setModalError(null);
         if (st) {
             setSelectedStructure(st);
             setStructureForm({
@@ -135,14 +159,14 @@ function FeePage() {
 
     const submitStructure = async (e) => {
         e.preventDefault();
-        if (!isAdmin) return;
+        if (!isFinance) return;
         setIsSubmitting(true);
         setError(null);
         try {
             const dataToSubmit = {
                 ...structureForm,
                 amount: Number(structureForm.amount),
-                applicableClasses: structureForm.applicableClasses.split(',').map(s => s.trim())
+                applicableClasses: String(structureForm.applicableClasses || '').split(',').map(s => s.trim()).filter(Boolean)
             };
             if (selectedStructure) {
                 await updateFeeStructure(selectedStructure._id, dataToSubmit);
@@ -152,14 +176,14 @@ function FeePage() {
             setIsStructureModalOpen(false);
             fetchStructures();
         } catch (err) {
-            setError(err.response?.data?.message || 'Failed to save fee structure');
+            setModalError(err.response?.data?.message || 'Failed to save fee structure');
         } finally {
             setIsSubmitting(false);
         }
     };
 
     const handleDeleteStructure = async (id) => {
-        if (!isAdmin) return;
+        if (!isFinance) return;
         if (window.confirm('Are you sure you want to delete this fee structure?')) {
             try {
                 await deleteFeeStructure(id);
@@ -171,16 +195,24 @@ function FeePage() {
     };
 
     // Record Handlers
-    const openRecordModal = () => {
-        if (!isAdmin) return;
+    const openRecordModal = async () => {
+        if (!isFinance) return;
         setSelectedRecord(null);
         setRecordForm({ studentId: '', feeStructureId: '', amountDue: '' });
+        setRecordStudent(null);
+        setModalError(null);
         setIsRecordModalOpen(true);
+        try {
+            const data = await listFeeStructures({ status: 'ACTIVE', limit: 100 });
+            setStructureOptions(data.data || []);
+        } catch (err) {
+            setModalError(err.response?.data?.message || 'Failed to load fee structures');
+        }
     };
 
     const submitRecord = async (e) => {
         e.preventDefault();
-        if (!isAdmin) return;
+        if (!isFinance) return;
         setIsSubmitting(true);
         setError(null);
         try {
@@ -193,7 +225,7 @@ function FeePage() {
             setIsRecordModalOpen(false);
             fetchRecords();
         } catch (err) {
-            setError(err.response?.data?.message || 'Failed to assign fee record');
+            setModalError(err.response?.data?.message || 'Failed to assign fee record');
         } finally {
             setIsSubmitting(false);
         }
@@ -201,23 +233,52 @@ function FeePage() {
 
     // Payment Handlers
     const openPaymentModal = (record) => {
-        if (!isAdmin) return;
+        if (!isFinance) return;
         setSelectedRecord(record);
         setPaymentAmount('');
+        setPaymentDetails({ method: 'CASH', reference: '', note: '' });
+        setModalError(null);
         setIsPaymentModalOpen(true);
     };
 
     const submitPayment = async (e) => {
         e.preventDefault();
-        if (!isAdmin) return;
+        if (!isFinance) return;
         setIsSubmitting(true);
         setError(null);
         try {
-            await payFeeRecord(selectedRecord._id, { paymentAmount: Number(paymentAmount) });
+            const updated = await payFeeRecord(selectedRecord._id, { paymentAmount: Number(paymentAmount), ...paymentDetails });
+            const receipt = updated?.payments?.[updated.payments.length - 1]?.receiptNumber;
+            setNotice(receipt ? `Payment recorded. Receipt ${receipt}.` : 'Payment recorded.');
             setIsPaymentModalOpen(false);
             fetchRecords();
+            if (updated?._id && receipt) setHistoryRecord(updated);
         } catch (err) {
-            setError(err.response?.data?.message || 'Failed to process payment');
+            setModalError(err.response?.data?.message || 'Failed to process payment');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const openDiscountModal = (record) => {
+        if (!isAdmin) return;
+        setDiscountRecord(record);
+        setDiscountForm({ discount: record.discount ? String(record.discount) : '', reason: record.discountReason || '' });
+        setModalError(null);
+    };
+
+    const submitDiscount = async (e) => {
+        e.preventDefault();
+        if (!isAdmin) return;
+        setIsSubmitting(true);
+        setModalError(null);
+        try {
+            await financeApi.applyDiscount(discountRecord._id, { discount: Number(discountForm.discount || 0), reason: discountForm.reason });
+            setNotice('Concession saved.');
+            setDiscountRecord(null);
+            fetchRecords();
+        } catch (err) {
+            setModalError(err.response?.data?.message || 'Failed to apply concession');
         } finally {
             setIsSubmitting(false);
         }
@@ -239,10 +300,10 @@ function FeePage() {
                 <div>
                     <h1 className="text-2xl font-bold text-ink-900">Fee Management</h1>
                     <p className="mt-2 text-sm text-ink-500">
-                        {isAdmin ? 'Manage fee structures and process student payments.' : 'View fee requirements and records.'}
+                        {isFinance ? 'Manage fee structures, record payments, concessions and receipts.' : 'View fee requirements, payments and receipts.'}
                     </p>
                 </div>
-                {isAdmin && (
+                {isFinance && activeTab !== 'summary' && (
                     <div className="mt-4 sm:mt-0 flex space-x-3">
                         {activeTab === 'structures' ? (
                             <Button
@@ -263,7 +324,7 @@ function FeePage() {
                 )}
             </div>
 
-            {(isAdmin || isTeacher) && (
+            {(isFinance || isTeacher) && (
                 <div className="mb-6 border-b border-ink-200">
                     <nav className="-mb-px flex space-x-8">
                         <button
@@ -278,11 +339,26 @@ function FeePage() {
                         >
                             Student Records
                         </button>
+                        {isFinance && (
+                            <button
+                                onClick={() => setActiveTab('summary')}
+                                className={`${activeTab === 'summary' ? 'border-brand-500 text-brand-600' : 'border-transparent text-ink-500 hover:text-ink-700 hover:border-ink-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+                            >
+                                Collections &amp; Dues
+                            </button>
+                        )}
                     </nav>
                 </div>
             )}
 
-            <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-4">
+            {notice && (
+                <div className="mb-6 flex items-start justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
+                    <span>{notice}</span>
+                    <button type="button" onClick={() => setNotice('')} className="font-medium">Dismiss</button>
+                </div>
+            )}
+
+            {activeTab !== 'summary' && <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-4">
                 {activeTab === 'structures' ? (
                     <>
                         <input type="text" placeholder="Search structures..." value={search} onChange={(e) => setSearch(e.target.value)} className="block w-full rounded-md border border-ink-300 px-3 py-2 text-base text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500" />
@@ -295,7 +371,17 @@ function FeePage() {
                     </>
                 ) : (
                     <>
-                        {isAdmin && <input type="text" placeholder="Student ID" value={studentId} onChange={(e) => setStudentId(e.target.value)} className="block w-full rounded-md border border-ink-300 px-3 py-2 text-base text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500" />}
+                        {isFinance && (
+                            <div className="sm:col-span-2">
+                                <StudentPicker
+                                    id="fee-student-filter"
+                                    value={studentId}
+                                    selected={filterStudent}
+                                    placeholder="Filter by student..."
+                                    onChange={(id, student) => { setStudentId(id); setFilterStudent(student); }}
+                                />
+                            </div>
+                        )}
                         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="block w-full rounded-md border border-ink-300 px-3 py-2 text-base text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500">
                             <option value="">All Payment Statuses</option>
                             <option value="PENDING">Pending</option>
@@ -305,7 +391,7 @@ function FeePage() {
                         </select>
                     </>
                 )}
-            </div>
+            </div>}
 
             {error && (
                 <div className="mb-6 rounded-lg bg-red-50 p-4 border border-red-200 text-sm text-red-600">
@@ -313,7 +399,9 @@ function FeePage() {
                 </div>
             )}
 
-            {loading ? (
+            {activeTab === 'summary' ? (
+                <FinanceSummary />
+            ) : loading ? (
                 <div className="flex justify-center p-8">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600"></div>
                 </div>
@@ -328,12 +416,12 @@ function FeePage() {
                     <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
                         {structures.map((st) => (
                             <div key={st._id} className="bg-white rounded-xl border border-ink-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
-                                <div className="p-5" onClick={() => !isAdmin && setViewOnlyItem(st)}>
+                                <div className="p-5" onClick={() => !isFinance && setViewOnlyItem(st)}>
                                     <div className="flex items-center justify-between mb-2">
                                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${st.status === 'ACTIVE' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
                                             {st.status}
                                         </span>
-                                        <span className="text-xs font-bold text-ink-700">${st.amount}</span>
+                                        <span className="text-xs font-bold text-ink-700">{formatCurrency(st.amount)}</span>
                                     </div>
                                     <h3 className="text-lg font-medium text-ink-900 mb-1 cursor-pointer select-none" onClick={() => setViewOnlyItem(st)}>{st.title}</h3>
                                     <p className="text-sm text-ink-500 mb-2">Year: {st.academicYear}</p>
@@ -341,7 +429,7 @@ function FeePage() {
                                         {st.dueDate && <span className={new Date(st.dueDate) < new Date() && st.status === 'ACTIVE' ? 'text-red-600' : ''}>Due: {new Date(st.dueDate).toLocaleDateString()}</span>}
                                     </div>
                                 </div>
-                                {isAdmin && (
+                                {isFinance && (
                                     <div className="px-5 py-3 border-t border-ink-100 bg-ink-50 flex justify-end space-x-3">
                                         <button onClick={() => setViewOnlyItem(st)} className="text-sm text-brand-600 hover:text-brand-900">View</button>
                                         <button onClick={() => openStructureModal(st)} className="text-sm text-brand-600 hover:text-brand-900">Edit</button>
@@ -370,7 +458,7 @@ function FeePage() {
                                     <th className="px-6 py-3 text-left text-xs font-medium text-ink-500 uppercase tracking-wider">Amount Due</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-ink-500 uppercase tracking-wider">Paid</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-ink-500 uppercase tracking-wider">Status</th>
-                                    {isAdmin && <th className="px-6 py-3 text-right text-xs font-medium text-ink-500 uppercase tracking-wider">Action</th>}
+                                    <th className="px-6 py-3 text-right text-xs font-medium text-ink-500 uppercase tracking-wider">Action</th>
                                 </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-ink-200">
@@ -384,28 +472,37 @@ function FeePage() {
                                             <div className="text-sm text-ink-900">{record.feeStructureId?.title}</div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-ink-500">
-                                            {record.feeStructureId?.dueDate ? new Date(record.feeStructureId.dueDate).toLocaleDateString() : 'N/A'}
+                                            {(record.dueDate || record.feeStructureId?.dueDate) ? new Date(record.dueDate || record.feeStructureId.dueDate).toLocaleDateString() : 'N/A'}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-ink-700">
-                                            ${record.amountDue}
+                                            {formatCurrency(netDue(record))}
+                                            {record.discount > 0 && <div className="text-xs font-normal text-ink-500">after {formatCurrency(record.discount)} concession</div>}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-ink-700">
-                                            ${record.amountPaid}
+                                            {formatCurrency(record.amountPaid)}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(record.status)}`}>
                                                 {record.status}
                                             </span>
                                         </td>
-                                        {isAdmin && (
-                                            <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                                {record.amountPaid < record.amountDue && (
+                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                            <div className="flex justify-end gap-3">
+                                                {isFinance && record.amountPaid < netDue(record) && (
                                                     <button onClick={() => openPaymentModal(record)} className="text-brand-600 hover:text-brand-900">
                                                         Process Payment
                                                     </button>
                                                 )}
-                                            </td>
-                                        )}
+                                                {isAdmin && record.status !== 'PAID' && (
+                                                    <button onClick={() => openDiscountModal(record)} className="text-brand-600 hover:text-brand-900">
+                                                        Concession
+                                                    </button>
+                                                )}
+                                                <button onClick={() => setHistoryRecord(record)} className="text-brand-600 hover:text-brand-900">
+                                                    Payments{record.payments?.length ? ` (${record.payments.length})` : ''}
+                                                </button>
+                                            </div>
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -417,6 +514,7 @@ function FeePage() {
             {/* Structure Modal */}
             <Modal isOpen={isStructureModalOpen} onClose={() => setIsStructureModalOpen(false)} title={selectedStructure ? "Edit Fee Structure" : "Create Fee Structure"}>
                 <form onSubmit={submitStructure} className="space-y-4 pt-4">
+                    {modalError && <div className="rounded border border-red-200 bg-red-50 p-2 text-sm text-red-600">{modalError}</div>}
                     <div>
                         <label className="block text-sm font-medium text-ink-700">Title <span className="text-red-500">*</span></label>
                         <input type="text" value={structureForm.title} onChange={e => setStructureForm({ ...structureForm, title: e.target.value })} required className="mt-1 block w-full rounded-md border border-ink-300 px-3 py-2 text-base text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500" />
@@ -460,13 +558,27 @@ function FeePage() {
             {/* Record Modal */}
             <Modal isOpen={isRecordModalOpen} onClose={() => setIsRecordModalOpen(false)} title="Assign Fee to Student">
                 <form onSubmit={submitRecord} className="space-y-4 pt-4">
+                    {modalError && <div className="rounded border border-red-200 bg-red-50 p-2 text-sm text-red-600">{modalError}</div>}
                     <div>
-                        <label className="block text-sm font-medium text-ink-700">Student ID <span className="text-red-500">*</span></label>
-                        <input type="text" placeholder="MongoDB Object ID of Student" value={recordForm.studentId} onChange={e => setRecordForm({ ...recordForm, studentId: e.target.value })} required className="mt-1 block w-full rounded-md border border-ink-300 px-3 py-2 text-base text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500" />
+                        <label htmlFor="fee-record-student" className="block text-sm font-medium text-ink-700">Student <span className="text-red-500">*</span></label>
+                        <div className="mt-1">
+                            <StudentPicker
+                                id="fee-record-student"
+                                required
+                                value={recordForm.studentId}
+                                selected={recordStudent}
+                                onChange={(id, student) => { setRecordForm((prev) => ({ ...prev, studentId: id })); setRecordStudent(student); }}
+                            />
+                        </div>
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-ink-700">Fee Structure ID <span className="text-red-500">*</span></label>
-                        <input type="text" placeholder="MongoDB Object ID of Fee Structure" value={recordForm.feeStructureId} onChange={e => setRecordForm({ ...recordForm, feeStructureId: e.target.value })} required className="mt-1 block w-full rounded-md border border-ink-300 px-3 py-2 text-base text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500" />
+                        <label htmlFor="fee-record-structure" className="block text-sm font-medium text-ink-700">Fee Structure <span className="text-red-500">*</span></label>
+                        <select id="fee-record-structure" value={recordForm.feeStructureId} onChange={e => setRecordForm({ ...recordForm, feeStructureId: e.target.value })} required className="mt-1 block w-full rounded-md border border-ink-300 px-3 py-2 text-base text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500">
+                            <option value="">Select a fee structure...</option>
+                            {structureOptions.map((st) => (
+                                <option key={st._id} value={st._id}>{st.title} · {st.academicYear} · {formatCurrency(st.amount)}</option>
+                            ))}
+                        </select>
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-ink-700">Custom Amount Due (Optional)</label>
@@ -474,7 +586,7 @@ function FeePage() {
                     </div>
                     <div className="mt-6 flex justify-end space-x-3">
                         <Button type="button" variant="secondary" onClick={() => setIsRecordModalOpen(false)} disabled={isSubmitting}>Cancel</Button>
-                        <Button type="submit" disabled={isSubmitting}>
+                        <Button type="submit" disabled={isSubmitting || !recordForm.studentId || !recordForm.feeStructureId}>
                             {isSubmitting ? 'Assigning...' : 'Assign Fee'}
                         </Button>
                     </div>
@@ -485,16 +597,34 @@ function FeePage() {
             <Modal isOpen={isPaymentModalOpen} onClose={() => setIsPaymentModalOpen(false)} title="Process Payment">
                 {selectedRecord && (
                     <form onSubmit={submitPayment} className="space-y-4 pt-4">
+                        {modalError && <div className="rounded border border-red-200 bg-red-50 p-2 text-sm text-red-600">{modalError}</div>}
                         <div className="bg-brand-50 p-4 rounded border border-brand-200 text-brand-800 text-sm mb-4 flex flex-col space-y-1">
                             <span><strong>Student:</strong> {selectedRecord.studentId?.firstName} {selectedRecord.studentId?.lastName}</span>
-                            <span><strong>Total Due:</strong> ${selectedRecord.amountDue}</span>
-                            <span><strong>Already Paid:</strong> ${selectedRecord.amountPaid}</span>
-                            <span><strong>Remaining:</strong> ${(selectedRecord.amountDue - selectedRecord.amountPaid).toFixed(2)}</span>
+                            <span><strong>Total Due:</strong> {formatCurrency(netDue(selectedRecord))}{selectedRecord.discount > 0 ? ` (after ${formatCurrency(selectedRecord.discount)} concession)` : ''}</span>
+                            <span><strong>Already Paid:</strong> {formatCurrency(selectedRecord.amountPaid)}</span>
+                            <span><strong>Remaining:</strong> {formatCurrency(netDue(selectedRecord) - selectedRecord.amountPaid)}</span>
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-ink-700">Payment Amount <span className="text-red-500">*</span></label>
-                            <input type="number" min="0.01" max={selectedRecord.amountDue - selectedRecord.amountPaid} step="0.01" value={paymentAmount} onChange={e => setPaymentAmount(e.target.value)} required className="mt-1 block w-full rounded-md border border-ink-300 px-3 py-2 text-base text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500" />
+                            <input type="number" min="0.01" max={netDue(selectedRecord) - selectedRecord.amountPaid} step="0.01" value={paymentAmount} onChange={e => setPaymentAmount(e.target.value)} required className="mt-1 block w-full rounded-md border border-ink-300 px-3 py-2 text-base text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500" />
                         </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label htmlFor="pay-method" className="block text-sm font-medium text-ink-700">Payment Method <span className="text-red-500">*</span></label>
+                                <select id="pay-method" value={paymentDetails.method} onChange={e => setPaymentDetails({ ...paymentDetails, method: e.target.value })} className="mt-1 block w-full rounded-md border border-ink-300 px-3 py-2 text-base text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500">
+                                    {PAYMENT_METHODS.map((m) => <option key={m} value={m}>{methodLabel(m)}</option>)}
+                                </select>
+                            </div>
+                            <div>
+                                <label htmlFor="pay-ref" className="block text-sm font-medium text-ink-700">Reference</label>
+                                <input id="pay-ref" type="text" placeholder="Cheque / UTR no." value={paymentDetails.reference} onChange={e => setPaymentDetails({ ...paymentDetails, reference: e.target.value })} className="mt-1 block w-full rounded-md border border-ink-300 px-3 py-2 text-base text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500" />
+                            </div>
+                        </div>
+                        <div>
+                            <label htmlFor="pay-note" className="block text-sm font-medium text-ink-700">Note</label>
+                            <input id="pay-note" type="text" value={paymentDetails.note} onChange={e => setPaymentDetails({ ...paymentDetails, note: e.target.value })} className="mt-1 block w-full rounded-md border border-ink-300 px-3 py-2 text-base text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500" />
+                        </div>
+                        <p className="text-xs text-ink-500">Records a payment received at the school office. No online payment is processed and no card details are stored.</p>
                         <div className="mt-6 flex justify-end space-x-3">
                             <Button type="button" variant="secondary" onClick={() => setIsPaymentModalOpen(false)} disabled={isSubmitting}>Cancel</Button>
                             <Button type="submit" disabled={isSubmitting}>
@@ -505,13 +635,62 @@ function FeePage() {
                 )}
             </Modal>
 
+            {/* Concession Modal (administrator approval) */}
+            <Modal isOpen={!!discountRecord} onClose={() => !isSubmitting && setDiscountRecord(null)} title="Fee Concession">
+                {discountRecord && (
+                    <form onSubmit={submitDiscount} className="space-y-4 pt-4">
+                        {modalError && <div className="rounded border border-red-200 bg-red-50 p-2 text-sm text-red-600">{modalError}</div>}
+                        <p className="text-sm text-ink-700">{discountRecord.studentId?.firstName} {discountRecord.studentId?.lastName} · {discountRecord.feeStructureId?.title} · billed {formatCurrency(discountRecord.amountDue)}, paid {formatCurrency(discountRecord.amountPaid)}</p>
+                        <div>
+                            <label htmlFor="disc-amount" className="block text-sm font-medium text-ink-700">Concession amount <span className="text-red-500">*</span></label>
+                            <input id="disc-amount" type="number" min="0" max={discountRecord.amountDue} step="0.01" required value={discountForm.discount} onChange={e => setDiscountForm({ ...discountForm, discount: e.target.value })} className="mt-1 block w-full rounded-md border border-ink-300 px-3 py-2 text-base text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500" />
+                            <p className="mt-1 text-xs text-ink-500">Set 0 to remove an existing concession.</p>
+                        </div>
+                        <div>
+                            <label htmlFor="disc-reason" className="block text-sm font-medium text-ink-700">Reason (scholarship, sibling, waiver...)</label>
+                            <input id="disc-reason" type="text" required={Number(discountForm.discount) > 0} value={discountForm.reason} onChange={e => setDiscountForm({ ...discountForm, reason: e.target.value })} className="mt-1 block w-full rounded-md border border-ink-300 px-3 py-2 text-base text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500" />
+                        </div>
+                        <div className="mt-6 flex justify-end space-x-3">
+                            <Button type="button" variant="secondary" onClick={() => setDiscountRecord(null)} disabled={isSubmitting}>Cancel</Button>
+                            <Button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Saving...' : 'Save Concession'}</Button>
+                        </div>
+                    </form>
+                )}
+            </Modal>
+
+            {/* Payment history & receipts */}
+            <Modal isOpen={!!historyRecord} onClose={() => setHistoryRecord(null)} title="Payment History" size="max-w-lg">
+                {historyRecord && (
+                    <div className="space-y-4 pt-2">
+                        <p className="text-sm text-ink-700">{historyRecord.feeStructureId?.title || 'Fee'} · net {formatCurrency(netDue(historyRecord))} · paid {formatCurrency(historyRecord.amountPaid)}</p>
+                        {historyRecord.discount > 0 && <p className="text-xs text-ink-500">Concession {formatCurrency(historyRecord.discount)}{historyRecord.discountReason ? ` — ${historyRecord.discountReason}` : ''}</p>}
+                        {(historyRecord.payments || []).length === 0 ? (
+                            <p className="text-sm text-ink-500">{historyRecord.amountPaid > 0 ? 'Payments for this record were made before itemised receipts were introduced.' : 'No payments recorded yet.'}</p>
+                        ) : (
+                            <ul className="divide-y divide-ink-200 rounded-md border border-ink-200">
+                                {[...historyRecord.payments].reverse().map((p) => (
+                                    <li key={p.receiptNumber} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
+                                        <div>
+                                            <p className="font-medium text-ink-900">{formatCurrency(p.amount)} · {methodLabel(p.method)}</p>
+                                            <p className="text-xs text-ink-500">{new Date(p.paidAt).toLocaleString()} · {p.receiptNumber}{p.reference ? ` · Ref ${p.reference}` : ''}</p>
+                                        </div>
+                                        <Link to={`/fees/records/${historyRecord._id}/receipts/${p.receiptNumber}`} className="shrink-0 font-medium text-brand-600 hover:text-brand-900">Receipt</Link>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                        <div className="flex justify-end"><Button variant="secondary" onClick={() => setHistoryRecord(null)}>Close</Button></div>
+                    </div>
+                )}
+            </Modal>
+
             {/* View Modal */}
             <Modal isOpen={!!viewOnlyItem} onClose={() => setViewOnlyItem(null)} title="Fee Structure Details">
                 {viewOnlyItem && (
                     <div className="space-y-4 pt-4">
                         <div className="bg-gray-50 p-4 rounded text-sm text-gray-800 space-y-2">
                             <p><strong>Title:</strong> {viewOnlyItem.title}</p>
-                            <p><strong>Amount:</strong> ${viewOnlyItem.amount}</p>
+                            <p><strong>Amount:</strong> {formatCurrency(viewOnlyItem.amount)}</p>
                             <p><strong>Academic Year:</strong> {viewOnlyItem.academicYear}</p>
                             <p><strong>Applicable Classes:</strong> {Array.isArray(viewOnlyItem.applicableClasses) ? viewOnlyItem.applicableClasses.join(', ') : viewOnlyItem.applicableClasses}</p>
                             <p><strong>Due Date:</strong> {viewOnlyItem.dueDate ? new Date(viewOnlyItem.dueDate).toLocaleDateString() : 'N/A'}</p>

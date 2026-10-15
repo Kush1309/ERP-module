@@ -12,6 +12,26 @@ const parentProfileSchema = new mongoose.Schema(
             unique: true,
             index: true,
         },
+        // Contact details captured when an administrator creates the parent account.
+        // Optional so that previously seeded profiles remain valid.
+        firstName: {
+            type: String,
+            trim: true,
+        },
+        lastName: {
+            type: String,
+            trim: true,
+        },
+        phone: {
+            type: String,
+            trim: true,
+        },
+        email: {
+            type: String,
+            trim: true,
+            lowercase: true,
+            default: null,
+        },
         students: [
             {
                 type: mongoose.Schema.Types.ObjectId,

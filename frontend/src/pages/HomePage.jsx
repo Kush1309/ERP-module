@@ -5,6 +5,7 @@ import Card from '../components/Card';
 import { checkHealth } from '../services/healthService';
 import { useAuth } from '../hooks/useAuth';
 import { ROLE_HOME } from '../constants/roles';
+import { API_BASE_URL } from '../constants/api';
 
 function HomePage() {
   const { isAuthenticated, user } = useAuth();
@@ -40,14 +41,15 @@ function HomePage() {
     <section className="mx-auto flex w-full max-w-3xl flex-1 flex-col justify-center gap-8">
       <div className="space-y-4">
         <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand-600">
-          Module 2 — Authentication
+          School ERP
         </p>
         <h1 className="font-display text-4xl font-semibold leading-tight tracking-tight text-ink-900 sm:text-5xl">
           A calm starting point for school operations.
         </h1>
         <p className="max-w-2xl text-lg leading-relaxed text-ink-600">
-          Secure login with role-based access for Admin, Teacher, Student, and
-          Parent. Business modules will be added one at a time.
+          Students, teachers, attendance, examinations, fees, library, transport
+          and communication in one place — with dedicated portals for
+          administrators, teachers, students and parents.
         </p>
       </div>
 
@@ -91,7 +93,7 @@ function HomePage() {
         )}
         <Button
           as="a"
-          href="/api/health"
+          href={`${API_BASE_URL}/health`}
           target="_blank"
           rel="noreferrer"
           variant="secondary"

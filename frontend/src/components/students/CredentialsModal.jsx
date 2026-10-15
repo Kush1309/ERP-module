@@ -9,6 +9,7 @@ export default function CredentialsModal({ isOpen, data, onDone }) {
 
     const isTeacher = !!data.teacher;
     const isStudent = !!data.student;
+    const isParent = !!data.parent;
 
     const displayIdLabel = isTeacher ? 'Teacher ID' : isStudent ? 'Student ID' : 'Profile ID';
     const displayIdValue = isTeacher ? data.teacher?.id : isStudent ? data.student?.studentId : null;
@@ -16,7 +17,7 @@ export default function CredentialsModal({ isOpen, data, onDone }) {
     const loginId = data.credentials?.loginId || data.student?.loginId || data.teacher?.user?.loginId;
     const { temporaryPassword } = data.credentials;
 
-    const title = isTeacher ? "Teacher Created Successfully" : isStudent ? "Student Created Successfully" : "Account Created Successfully";
+    const title = isTeacher ? "Teacher Created Successfully" : isStudent ? "Student Created Successfully" : isParent ? "Parent Account Created Successfully" : "Account Created Successfully";
 
     const handleCopy = async () => {
         try {

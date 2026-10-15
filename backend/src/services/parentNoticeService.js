@@ -84,7 +84,7 @@ const getParentNoticeById = async (parentUserId, noticeId) => {
     const filter = buildParentNoticeVisibilityFilter(students);
 
     if (!filter) {
-        throw new AppError('Notice explicitly securely unavailable', 404);
+        throw new AppError('Notice not found', 404);
     }
 
     filter._id = noticeId;
@@ -94,7 +94,7 @@ const getParentNoticeById = async (parentUserId, noticeId) => {
         .lean();
 
     if (!notice) {
-        throw new AppError('Notice explicitly natively definitively unavailable correctly securely', 404);
+        throw new AppError('Notice not found', 404);
     }
 
     return notice;

@@ -1,24 +1,32 @@
 require('dotenv').config();
-
 const app = require('./app');
-const { validateEnv } = require('./config/env');
-const { connectDatabase } = require('./config/database');
+const mongoose = require('mongoose');
 
-const startServer = async () => {
-  try {
-    validateEnv();
-    await connectDatabase();
+const PORT = process.env.PORT || 5000;
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/school-erp';
 
-    const port = process.env.PORT;
+// Connect to MongoDB
+mongoose
+  .connect(MONGODB_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  })
+  .then(() => {
+    console.log('Connected to MongoDB');
 
-    app.listen(port, () => {
-      console.log(`School ERP API running on port ${port}`);
-      console.log(`Environment: ${process.env.NODE_ENV}`);
+    // Start server
+    app.listen(PORT, () => {
+      console.log(`Server running on http://localhost:${PORT}`);
+      console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
     });
-  } catch (error) {
-    console.error('Failed to start server:', error.message);
+  })
+  .catch((err) => {
+    console.error('MongoDB connection error:', err);
     process.exit(1);
-  }
-};
+  });
 
-startServer();
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (err) => {
+  console.error('Unhandled Promise Rejection:', err);
+  process.exit(1);
+});

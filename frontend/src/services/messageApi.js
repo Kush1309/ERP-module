@@ -24,3 +24,9 @@ export const markMessageRead = async (messageId) => {
     const response = await api.patch(`/messages/${messageId}/read`);
     return response.data;
 };
+
+// People the current user is allowed to start a conversation with
+export const getContacts = async (search) => {
+    const response = await api.get('/messages/contacts', { params: search ? { search } : {} });
+    return response.data?.data || [];
+};

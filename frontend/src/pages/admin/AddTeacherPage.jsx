@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Button from '../../components/Button';
 import Card from '../../components/Card';
+import useClassOptions from '../../hooks/useClassOptions';
+import HrFields from '../../components/common/HrFields';
 import { createTeacher } from '../../services/teacherApi';
 import CredentialsModal from '../../components/students/CredentialsModal';
 
@@ -14,9 +16,13 @@ function AddTeacherPage() {
         email: '',
         phone: '',
         assignedClass: '',
-        assignedSection: ''
+        assignedSection: '',
+        department: '',
+        designation: '',
+        joiningDate: ''
     });
 
+    const classOptions = useClassOptions();
     const [errors, setErrors] = useState({});
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [apiError, setApiError] = useState('');
@@ -75,8 +81,6 @@ function AddTeacherPage() {
         navigate('/admin/teachers', { replace: true });
     };
 
-    const CLASSES = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'];
-    const SECTIONS = ['A', 'B', 'C', 'D', 'E', 'F'];
 
     return (
         <div className="mx-auto w-full max-w-4xl pb-10">
@@ -134,7 +138,7 @@ function AddTeacherPage() {
                             <label className="text-sm font-medium text-ink-700">Assigned Class *</label>
                             <select name="assignedClass" value={formData.assignedClass} onChange={handleChange} className="mt-1 block w-full rounded-md border border-ink-300 px-3 py-2 text-sm text-ink-900 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500">
                                 <option value="">Select Class</option>
-                                {CLASSES.map(c => <option key={c} value={c}>Class {c}</option>)}
+                                {classOptions.classes.map(c => <option key={c} value={c}>Class {c}</option>)}
                             </select>
                             {errors.assignedClass && <p className="mt-1 text-xs text-red-600">{errors.assignedClass}</p>}
                         </div>
@@ -143,9 +147,24 @@ function AddTeacherPage() {
                             <label className="text-sm font-medium text-ink-700">Assigned Section *</label>
                             <select name="assignedSection" value={formData.assignedSection} onChange={handleChange} className="mt-1 block w-full rounded-md border border-ink-300 px-3 py-2 text-sm text-ink-900 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500">
                                 <option value="">Select Section</option>
-                                {SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                                {classOptions.sectionsFor(formData.assignedClass).map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
                             </select>
                             {errors.assignedSection && <p className="mt-1 text-xs text-red-600">{errors.assignedSection}</p>}
+                        </div>
+
+                        <HrFields
+                            idPrefix="teacher"
+                            category="TEACHING"
+                            department={formData.department}
+                            designation={formData.designation}
+                            labelClass="text-sm font-medium text-ink-700"
+                            fieldClass="mt-1 block w-full rounded-md border border-ink-300 px-3 py-2 text-sm text-ink-900 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500"
+                            onChange={(name, value) => setFormData((prev) => ({ ...prev, [name]: value }))}
+                        />
+
+                        <div>
+                            <label htmlFor="teacher-joining" className="text-sm font-medium text-ink-700">Joining Date</label>
+                            <input id="teacher-joining" type="date" name="joiningDate" value={formData.joiningDate} onChange={handleChange} className="mt-1 block w-full rounded-md border border-ink-300 px-3 py-2 text-sm text-ink-900 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500" />
                         </div>
                     </div>
 

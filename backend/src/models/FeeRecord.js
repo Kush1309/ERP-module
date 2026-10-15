@@ -27,6 +27,47 @@ const feeRecordSchema = new mongoose.Schema(
         paymentDate: {
             type: Date
         },
+        // Approved concession / waiver deducted from amountDue
+        discount: {
+            type: Number,
+            default: 0,
+            min: [0, 'Discount cannot be negative']
+        },
+        discountReason: {
+            type: String,
+            trim: true,
+            default: ''
+        },
+        discountApprovedBy: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+            default: null
+        },
+        // Copied from the fee structure when assigned (older records fall back to the structure)
+        dueDate: {
+            type: Date,
+            default: null
+        },
+        // Offline payment ledger (cash, cheque, bank transfer, UPI...) with receipt numbers
+        payments: [
+            {
+                amount: { type: Number, required: true, min: [0.01, 'Payment must be positive'] },
+                paidAt: { type: Date, default: Date.now },
+                method: {
+                    type: String,
+                    enum: ['CASH', 'CHEQUE', 'BANK_TRANSFER', 'UPI', 'CARD', 'OTHER'],
+                    default: 'CASH'
+                },
+                reference: { type: String, trim: true, default: '' },
+                note: { type: String, trim: true, default: '' },
+                receiptNumber: { type: String, required: true },
+                recordedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+            }
+        ],
+        // Late charge accrued per settings.feeLateFeePerDay while the fee is overdue
+        lateFee: { type: Number, min: 0, default: 0 },
+        lateFeeWaived: { type: Boolean, default: false },
+        lateFeeWaiverReason: { type: String, trim: true, default: '' },
         status: {
             type: String,
             enum: ['PENDING', 'PARTIAL', 'PAID', 'OVERDUE'],
@@ -40,18 +81,33 @@ const feeRecordSchema = new mongoose.Schema(
 // Block explicit identical structural assignments doubling up dynamically.
 feeRecordSchema.index({ studentId: 1, feeStructureId: 1 }, { unique: true });
 
-// Prevent amountPaid exceeding amountDue via pre-save validation
+// Net payable after concessions, including any (unwaived) late charge
+feeRecordSchema.virtual('netDue').get(function () {
+    return require('../utils/feeMath').netPayable(this);
+});
+
+feeRecordSchema.set('toJSON', { virtuals: true });
+feeRecordSchema.set('toObject', { virtuals: true });
+
+// Keep the paid amount within the net payable and derive the status
 feeRecordSchema.pre('save', function (next) {
-    if (this.amountPaid > this.amountDue) {
-        return next(new Error('Amount paid safely cannot mathematically exceed total amount due.'));
+    if ((this.discount || 0) > this.amountDue) {
+        return next(new Error('Discount cannot exceed the amount due.'));
+    }
+    const netDue = require('../utils/feeMath').netPayable(this);
+    if (this.amountPaid > netDue + 0.001) {
+        return next(new Error('Amount paid cannot exceed the net amount due.'));
     }
 
-    // Auto status
-    if (this.amountPaid === this.amountDue && this.amountDue > 0) {
+    if (this.amountPaid >= netDue) {
         this.status = 'PAID';
-        if (!this.paymentDate) this.paymentDate = new Date();
-    } else if (this.amountPaid > 0 && this.amountPaid < this.amountDue) {
+        if (!this.paymentDate && this.amountPaid > 0) this.paymentDate = new Date();
+    } else if (this.dueDate && this.dueDate < new Date()) {
+        this.status = 'OVERDUE';
+    } else if (this.amountPaid > 0) {
         this.status = 'PARTIAL';
+    } else {
+        this.status = 'PENDING';
     }
     next();
 });

@@ -6,6 +6,7 @@ const router = express.Router();
 
 router.use(authenticateUser);
 
+router.get('/contacts', messageController.getContacts);
 router.get('/conversations', messageController.getConversations);
 router.post('/conversations', messageController.createConversation);
 

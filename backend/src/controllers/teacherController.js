@@ -11,7 +11,10 @@ const createTeacher = asyncHandler(async (req, res) => {
         email,
         phone,
         assignedClass,
-        assignedSection
+        assignedSection,
+        department,
+        designation,
+        joiningDate
     } = req.body;
 
     if (!firstName || !lastName || !email || !phone || !assignedClass || !assignedSection) {
@@ -24,7 +27,10 @@ const createTeacher = asyncHandler(async (req, res) => {
         email,
         phone,
         assignedClass,
-        assignedSection
+        assignedSection,
+        department,
+        designation,
+        joiningDate
     };
 
     const { user, teacher, temporaryPassword } = await teacherService.createTeacherAccount(teacherData);
@@ -42,6 +48,8 @@ const createTeacher = asyncHandler(async (req, res) => {
                 phone: teacher.phone,
                 assignedClass: teacher.assignedClass,
                 assignedSection: teacher.assignedSection,
+                department: teacher.department,
+                designation: teacher.designation,
                 user: {
                     loginId: user.loginId,
                     role: user.role

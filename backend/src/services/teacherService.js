@@ -6,6 +6,7 @@ const { generateLoginId } = require('./loginIdService');
 const { hashPassword } = require('../utils/password');
 const { ROLES } = require('../constants/roles');
 const { generateTempPassword } = require('./studentService');
+const { runInTransaction } = require('../utils/transaction');
 
 const escapeRegex = (string) => string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -25,35 +26,29 @@ const createTeacherAccount = async (teacherData) => {
         }
     }
 
+    await require('./academicService').assertClassSectionAvailable(teacherData.assignedClass, teacherData.assignedSection, { adding: 0 });
+
     const ObjectToSave = {
         firstName: teacherData.firstName,
         lastName: teacherData.lastName,
         email: teacherData.email,
         phone: teacherData.phone,
         assignedClass: teacherData.assignedClass,
-        assignedSection: teacherData.assignedSection
+        assignedSection: teacherData.assignedSection,
+        ...(await require('./departmentService').normaliseAssignment({ department: teacherData.department, designation: teacherData.designation })),
+        ...(teacherData.joiningDate ? { joiningDate: teacherData.joiningDate } : {}),
     };
 
     const loginId = await generateLoginId(ROLES.TEACHER);
     const tempPassword = generateTempPassword();
     const hashedPassword = await hashPassword(tempPassword);
 
-    let session;
-    let useFallback = false;
-
-    try {
-        session = await mongoose.startSession();
-        session.startTransaction();
-    } catch (error) {
-        useFallback = true;
-    }
-
     let newUser;
     let newTeacher;
 
-    if (!useFallback) {
-        try {
-            [newUser] = await User.create([{
+    try {
+        ({ user: newUser, teacher: newTeacher } = await runInTransaction(async (session) => {
+            const [user] = await User.create([{
                 loginId,
                 password: hashedPassword,
                 role: ROLES.TEACHER,
@@ -61,53 +56,25 @@ const createTeacherAccount = async (teacherData) => {
                 isActive: true,
             }], { session });
 
-            [newTeacher] = await Teacher.create([{
-                ...ObjectToSave,
-                user: newUser._id
-            }], { session });
-
-            await session.commitTransaction();
-        } catch (error) {
-            if (session && session.inTransaction()) {
-                await session.abortTransaction();
-            }
-            if (error.codeName === 'IllegalOperation' || (error.message && error.message.includes('replica set'))) {
-                useFallback = true;
-            } else if (error.code === 11000) {
-                const duplicateField = Object.keys(error.keyValue || {})[0] || 'Field';
-                throw new AppError(`${duplicateField} already exists.`, 409);
-            } else {
+            try {
+                const [teacher] = await Teacher.create([{
+                    ...ObjectToSave,
+                    user: user._id
+                }], { session });
+                return { user, teacher };
+            } catch (error) {
+                if (!session) {
+                    await User.deleteOne({ _id: user._id });
+                }
                 throw error;
             }
-        } finally {
-            if (session) {
-                session.endSession();
-            }
+        }));
+    } catch (error) {
+        if (error.code === 11000) {
+            const duplicateField = Object.keys(error.keyValue || {})[0] || 'Field';
+            throw new AppError(`${duplicateField} already exists.`, 409);
         }
-    }
-
-    if (useFallback) {
-        newUser = await User.create({
-            loginId,
-            password: hashedPassword,
-            role: ROLES.TEACHER,
-            mustChangePassword: true,
-            isActive: true,
-        });
-
-        try {
-            newTeacher = await Teacher.create({
-                ...ObjectToSave,
-                user: newUser._id
-            });
-        } catch (err) {
-            await User.deleteOne({ _id: newUser._id });
-            if (err.code === 11000) {
-                const duplicateField = Object.keys(err.keyValue || {})[0] || 'Field';
-                throw new AppError(`${duplicateField} already exists.`, 409);
-            }
-            throw err;
-        }
+        throw error;
     }
 
     // Convert to plain object and remove DB internals
@@ -129,6 +96,7 @@ const getTeachersList = async (queryOpts) => {
     const query = {};
 
     if (className) query.assignedClass = className;
+    if (queryOpts.department) query.department = String(queryOpts.department);
     if (section) query.assignedSection = section;
 
     let userIdsFromUserQuery = null;
@@ -206,7 +174,7 @@ const updateTeacherById = async (id, rawData) => {
     }
 
     const whitelist = [
-        'firstName', 'lastName', 'email', 'phone', 'assignedClass', 'assignedSection'
+        'firstName', 'lastName', 'email', 'phone', 'assignedClass', 'assignedSection', 'department', 'designation', 'joiningDate'
     ];
 
     const safeUpdate = {};
@@ -218,6 +186,20 @@ const updateTeacherById = async (id, rawData) => {
 
     if (Object.keys(safeUpdate).length === 0) {
         throw new AppError('No valid editable fields provided for update', 400);
+    }
+
+    Object.assign(safeUpdate, await require('./departmentService').normaliseAssignment({ department: safeUpdate.department, designation: safeUpdate.designation }));
+    if (safeUpdate.joiningDate === '') safeUpdate.joiningDate = null;
+
+    if (safeUpdate.assignedClass !== undefined || safeUpdate.assignedSection !== undefined) {
+        const current = await Teacher.findById(id).select('assignedClass assignedSection').lean();
+        if (current) {
+            await require('./academicService').assertClassSectionAvailable(
+                safeUpdate.assignedClass ?? current.assignedClass,
+                safeUpdate.assignedSection ?? current.assignedSection,
+                { adding: 0 }
+            );
+        }
     }
 
     try {

@@ -76,3 +76,21 @@
     @apply min-h-screen;
   }
 }
+
+/* Printable pages (report cards, receipts, reports): print only the page content */
+@media print {
+  aside,
+  header {
+    display: none !important;
+  }
+  main {
+    overflow: visible !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
+  .h-screen,
+  .h-screen > div {
+    height: auto !important;
+    overflow: visible !important;
+  }
+}

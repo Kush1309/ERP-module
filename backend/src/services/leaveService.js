@@ -5,6 +5,7 @@ const Teacher = require('../models/Teacher');
 const Student = require('../models/Student');
 const ParentProfile = require('../models/ParentProfile');
 const AppError = require('../utils/AppError');
+const { notifyUsers } = require('./notificationService');
 
 const { isValidObjectId } = mongoose;
 
@@ -54,6 +55,14 @@ const createLeaveRequest = async (userId, data) => {
             throw new AppError('Admin must provide requesterId and requesterModel', 400);
         }
         validateObjectId(data.requesterId, 'Invalid requesterId');
+        if (!['Student', 'Teacher'].includes(data.requesterModel)) {
+            throw new AppError('requesterModel must be Student or Teacher', 400);
+        }
+        const RequesterModel = data.requesterModel === 'Student' ? Student : Teacher;
+        const requesterExists = await RequesterModel.exists({ _id: data.requesterId });
+        if (!requesterExists) {
+            throw new AppError(`${data.requesterModel} not found`, 404);
+        }
         requesterId = data.requesterId;
         requesterModel = data.requesterModel;
     }
@@ -104,7 +113,7 @@ const getLeaveRequests = async (userId, queryOpts = {}) => {
             .skip((page - 1) * limit)
             .limit(limit)
             .populate('requesterId', 'firstName lastName admissionNumber employeeId class section')
-            .populate('approverId', 'firstName lastName')
+            .populate('approverId', 'loginId role')
             .lean(),
         LeaveRequest.countDocuments(match)
     ]);
@@ -150,7 +159,7 @@ const getLeaveRequestById = async (userId, leaveId) => {
     const userRole = await resolveActor(userId);
     const leave = await LeaveRequest.findById(leaveId)
         .populate('requesterId', 'firstName lastName admissionNumber employeeId class section')
-        .populate('approverId', 'firstName lastName')
+        .populate('approverId', 'loginId role')
         .lean();
 
     if (!leave) throw new AppError('Leave request not found', 404);
@@ -188,11 +197,23 @@ const updateLeaveRequest = async (userId, leaveId, data) => {
         throw new AppError('No valid fields provided for update', 400);
     }
 
+    // Schema validators cannot see the stored startDate during an update query,
+    // so validate the resulting date range explicitly.
+    const effectiveStart = new Date(updatePayload.startDate !== undefined ? updatePayload.startDate : existing.startDate);
+    const effectiveEnd = new Date(updatePayload.endDate !== undefined ? updatePayload.endDate : existing.endDate);
+    if (Number.isNaN(effectiveStart.getTime()) || Number.isNaN(effectiveEnd.getTime())) {
+        throw new AppError('Invalid start or end date', 400);
+    }
+    if (effectiveEnd < effectiveStart) {
+        throw new AppError('End date must be greater than or equal to start date', 400);
+    }
+
     const updated = await LeaveRequest.findByIdAndUpdate(
         leaveId,
         { $set: updatePayload },
         { new: true, runValidators: true }
-    ).populate('requesterId').populate('approverId').lean();
+    ).populate('requesterId', 'firstName lastName admissionNumber employeeId class section')
+        .populate('approverId', 'loginId role').lean();
 
     return updated;
 };
@@ -248,7 +269,17 @@ const changeLeaveStatus = async (userId, leaveId, newStatus, data = {}) => {
         leaveId,
         { $set: updatePayload },
         { new: true, runValidators: true }
-    ).populate('requesterId').populate('approverId').lean();
+    ).populate('requesterId', 'firstName lastName admissionNumber employeeId class section user')
+        .populate('approverId', 'loginId role').lean();
+
+    if (updated?.requesterId?.user) {
+        await notifyUsers([updated.requesterId.user], {
+            type: 'LEAVE',
+            title: `Leave request ${newStatus.toLowerCase()}`,
+            message: `${new Date(updated.startDate).toISOString().slice(0, 10)} to ${new Date(updated.endDate).toISOString().slice(0, 10)}${updated.adminComment ? ` — ${updated.adminComment}` : ''}`,
+            link: '/leaves',
+        });
+    }
 
     return updated;
 };

@@ -150,6 +150,20 @@ function StudentManagementPage() {
     }
   };
 
+  const downloadCredentialsCsv = (credentials) => {
+    const escape = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+    const rows = [['Name', 'Login ID', 'Temporary Password'], ...credentials.map((c) => [c.name, c.loginId, c.temporaryPassword])];
+    const blob = new Blob([rows.map((r) => r.map(escape).join(',')).join('\n')], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'imported_student_credentials.csv';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  };
+
   const handleImport = async () => {
     if (!importFile) return;
     setImporting(true);
@@ -217,7 +231,7 @@ function StudentManagementPage() {
           <h1 className="mt-2 font-display text-3xl font-semibold text-ink-900">Student Management</h1>
           <p className="mt-2 text-sm text-ink-600">Manage student profiles and account status.</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <Button
             type="button"
             variant="secondary"
@@ -442,15 +456,16 @@ function StudentManagementPage() {
                       <td className="px-4 py-3 text-sm text-ink-700">{student.section}</td>
                       <td className="px-4 py-3 text-sm text-ink-700">{student.rollNumber}</td>
                       <td className="px-4 py-3 text-sm">
-                        <span className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
+                        <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${student.status === 'ACTIVE'
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          : 'bg-red-50 text-red-700 border-red-200'
+                          }`}>
                           {formatStatus(student.status)}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-sm">
-                        <Link to={`/admin/students/${student._id}`}>
-                          <button type="button" className="font-medium text-brand-700 transition hover:text-brand-800">
-                            View
-                          </button>
+                        <Link to={`/admin/students/${student._id}`} className="font-medium text-brand-700 transition hover:text-brand-800">
+                          View
                         </Link>
                       </td>
                     </tr>
@@ -519,6 +534,40 @@ function StudentManagementPage() {
                   <p className="text-xs mt-1 text-ink-700">
                     Rows processed: {importResult.data.totalRows} | Imported: {importResult.data.imported} | Failed: {importResult.data.failed}
                   </p>
+                )}
+                {importResult.success && importResult.data?.credentials?.length > 0 && (
+                  <div className="mt-3">
+                    <p className="text-xs font-medium text-ink-700">
+                      Temporary login credentials (shown only once — download or copy them now):
+                    </p>
+                    <div className="mt-2 max-h-40 overflow-y-auto rounded border border-emerald-200 bg-white">
+                      <table className="min-w-full text-xs">
+                        <thead className="bg-ink-50 text-left text-ink-600">
+                          <tr>
+                            <th className="px-2 py-1">Name</th>
+                            <th className="px-2 py-1">Login ID</th>
+                            <th className="px-2 py-1">Temporary Password</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-ink-100">
+                          {importResult.data.credentials.map((cred) => (
+                            <tr key={cred.loginId}>
+                              <td className="px-2 py-1 text-ink-800">{cred.name}</td>
+                              <td className="px-2 py-1 font-mono text-ink-800">{cred.loginId}</td>
+                              <td className="px-2 py-1 font-mono text-ink-800">{cred.temporaryPassword}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => downloadCredentialsCsv(importResult.data.credentials)}
+                      className="mt-2 text-xs font-semibold text-brand-700 hover:text-brand-800"
+                    >
+                      Download credentials CSV
+                    </button>
+                  </div>
                 )}
                 {importResult.data?.errors && importResult.data.errors.length > 0 && (
                   <div className="mt-3 max-h-40 overflow-y-auto border border-rose-200 rounded p-2 bg-white">

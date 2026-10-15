@@ -8,7 +8,11 @@ function TeacherAttendancePage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
-    const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
+    // Use the local calendar date (toISOString() would give yesterday's date before 05:30 IST)
+    const [date, setDate] = useState(() => {
+        const now = new Date();
+        return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    });
     const [attendanceState, setAttendanceState] = useState({});
     const [submitting, setSubmitting] = useState(false);
     const [success, setSuccess] = useState('');
@@ -76,7 +80,7 @@ function TeacherAttendancePage() {
 
         try {
             const payload = {
-                date: new Date(date).toISOString(),
+                date,
                 attendance: roster.map(st => ({
                     student: st._id,
                     status: attendanceState[st._id]

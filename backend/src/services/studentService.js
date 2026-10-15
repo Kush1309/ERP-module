@@ -6,13 +6,46 @@ const AppError = require('../utils/AppError');
 const { generateLoginId } = require('./loginIdService');
 const { hashPassword } = require('../utils/password');
 const { ROLES } = require('../constants/roles');
+const { runInTransaction } = require('../utils/transaction');
+
+const STUDENT_WRITABLE_FIELDS = [
+    'firstName', 'lastName', 'dateOfBirth', 'gender', 'class',
+    'section', 'rollNumber', 'admissionNumber', 'admissionDate',
+    'phone', 'email', 'address', 'city', 'state', 'postalCode'
+];
+
+// Only accept known profile fields from clients (prevents overriding user/status/_id)
+const sanitizeStudentInput = (data = {}) => {
+    const clean = {};
+    STUDENT_WRITABLE_FIELDS.forEach((field) => {
+        if (data[field] !== undefined) {
+            clean[field] = data[field];
+        }
+    });
+    if (typeof clean.email === 'string') {
+        clean.email = clean.email.trim() === '' ? null : clean.email.trim().toLowerCase();
+    }
+    if (typeof clean.gender === 'string') {
+        clean.gender = clean.gender.trim().toUpperCase();
+    }
+    return clean;
+};
 
 const generateTempPassword = () => {
     const randomHex = crypto.randomBytes(6).toString('hex');
     return `Temp${randomHex}A1`;
 };
 
-const createStudentAccount = async (studentData) => {
+const createStudentAccount = async (rawStudentData) => {
+    const studentData = sanitizeStudentInput(rawStudentData);
+
+    // Validate the profile before any login ID / user account is created
+    const probe = new Student({ ...studentData, user: new mongoose.Types.ObjectId() });
+    const validationError = probe.validateSync(undefined, { pathsToSkip: ['studentId'] });
+    if (validationError) {
+        throw validationError;
+    }
+
     const existingAdmission = await Student.findOne({ admissionNumber: studentData.admissionNumber });
     if (existingAdmission) {
         throw new AppError('Admission number already exists', 409);
@@ -29,70 +62,29 @@ const createStudentAccount = async (studentData) => {
     const tempPassword = generateTempPassword();
     const hashedPassword = await hashPassword(tempPassword);
 
-    let session;
-    let useFallback = false;
-
-    try {
-        session = await mongoose.startSession();
-        session.startTransaction();
-    } catch (error) {
-        useFallback = true;
-    }
-
-    let newUser;
-    let newStudent;
-
-    if (!useFallback) {
-        try {
-            [newUser] = await User.create([{
-                loginId,
-                password: hashedPassword,
-                role: ROLES.STUDENT,
-                mustChangePassword: true,
-                isActive: true,
-            }], { session });
-
-            [newStudent] = await Student.create([{
-                ...studentData,
-                user: newUser._id
-            }], { session });
-
-            await session.commitTransaction();
-        } catch (error) {
-            if (session.inTransaction()) {
-                await session.abortTransaction();
-            }
-            if (error.codeName === 'IllegalOperation' || (error.message && error.message.includes('replica set'))) {
-                useFallback = true;
-            } else {
-                throw error;
-            }
-        } finally {
-            if (session) {
-                session.endSession();
-            }
-        }
-    }
-
-    if (useFallback) {
-        newUser = await User.create({
+    const { user: newUser, student: newStudent } = await runInTransaction(async (session) => {
+        const [user] = await User.create([{
             loginId,
             password: hashedPassword,
             role: ROLES.STUDENT,
             mustChangePassword: true,
             isActive: true,
-        });
+        }], { session });
 
         try {
-            newStudent = await Student.create({
+            const [student] = await Student.create([{
                 ...studentData,
-                user: newUser._id
-            });
-        } catch (err) {
-            await User.deleteOne({ _id: newUser._id });
-            throw err;
+                user: user._id
+            }], { session });
+            return { user, student };
+        } catch (error) {
+            // Without a transaction we must remove the orphaned login ourselves.
+            if (!session) {
+                await User.deleteOne({ _id: user._id });
+            }
+            throw error;
         }
-    }
+    });
 
     return {
         user: newUser,
@@ -358,58 +350,19 @@ const bulkUpdateStudentStatus = async (studentIds, isActive) => {
         const studentIdsToUpdate = studentsToUpdate.map(s => s._id);
         const userIdsToUpdate = studentsToUpdate.map(s => s.user);
 
-        let session;
-        let useFallback = false;
-
-        try {
-            session = await mongoose.startSession();
-            session.startTransaction();
-        } catch (error) {
-            useFallback = true;
-        }
-
-        if (!useFallback) {
-            try {
-                await Student.updateMany(
-                    { _id: { $in: studentIdsToUpdate } },
-                    { $set: { status: targetStatus } },
-                    { session }
-                );
-
-                await User.updateMany(
-                    { _id: { $in: userIdsToUpdate } },
-                    { $set: { isActive: isActive } },
-                    { session }
-                );
-
-                await session.commitTransaction();
-            } catch (error) {
-                if (session.inTransaction()) {
-                    await session.abortTransaction();
-                }
-                if (error.codeName === 'IllegalOperation' || (error.message && error.message.includes('replica set'))) {
-                    useFallback = true;
-                } else {
-                    throw error;
-                }
-            } finally {
-                if (session) {
-                    session.endSession();
-                }
-            }
-        }
-
-        if (useFallback) {
+        await runInTransaction(async (session) => {
             await Student.updateMany(
                 { _id: { $in: studentIdsToUpdate } },
-                { $set: { status: targetStatus } }
+                { $set: { status: targetStatus } },
+                { session }
             );
 
             await User.updateMany(
                 { _id: { $in: userIdsToUpdate } },
-                { $set: { isActive: isActive } }
+                { $set: { isActive: isActive } },
+                { session }
             );
-        }
+        });
     }
 
     return {
@@ -477,69 +430,122 @@ const bulkImportStudents = async (studentDataArray, totalRows) => {
         return { imported: 0, failed: serviceErrors.length, serviceErrors };
     }
 
-    let session;
-    let useFallback = false;
+    const usersToCreate = [];
+    const studentsToCreate = [];
+    const credentials = [];
 
-    try {
-        session = await mongoose.startSession();
-        session.startTransaction();
-    } catch (error) {
-        useFallback = true;
+    for (const item of studentDataArray) {
+        const { rowNum, data } = item;
+
+        // Generate credentials sequentially so the login ID counter stays consistent
+        const loginId = await generateLoginId(ROLES.STUDENT);
+        const tempPassword = generateTempPassword();
+        const hashedPassword = await hashPassword(tempPassword);
+
+        const userDoc = new User({
+            loginId,
+            password: hashedPassword,
+            role: ROLES.STUDENT,
+            mustChangePassword: true,
+            isActive: true
+        });
+        usersToCreate.push(userDoc);
+
+        const studentDoc = new Student({
+            ...sanitizeStudentInput(data),
+            user: userDoc._id
+        });
+        studentsToCreate.push(studentDoc);
+
+        credentials.push({
+            row: rowNum,
+            name: `${data.firstName} ${data.lastName}`.trim(),
+            loginId,
+            temporaryPassword: tempPassword,
+        });
     }
 
     try {
-        const usersToCreate = [];
-        const studentsToCreate = [];
-
-        for (const item of studentDataArray) {
-            const { data } = item;
-
-            // Generate credentials sequentially for safety if id generator does not support multi-doc mapping simultaneously
-            const loginId = await generateLoginId(ROLES.STUDENT);
-            const tempPassword = generateTempPassword();
-            const hashedPassword = await hashPassword(tempPassword);
-
-            const userDoc = new User({
-                loginId,
-                password: hashedPassword,
-                role: ROLES.STUDENT,
-                mustChangePassword: true,
-                isActive: true
-            });
-            usersToCreate.push(userDoc);
-
-            const studentDoc = new Student({
-                ...data,
-                user: userDoc._id
-            });
-            studentsToCreate.push(studentDoc);
-        }
-
-        if (!useFallback) {
+        await runInTransaction(async (session) => {
             await User.insertMany(usersToCreate, { session });
-            await Student.insertMany(studentsToCreate, { session });
-            await session.commitTransaction();
-        } else {
-            await User.insertMany(usersToCreate);
-            await Student.insertMany(studentsToCreate);
-        }
-
+            try {
+                // Saved one by one so each student ID is generated sequentially
+                // (parallel validation could race on the ID counter).
+                for (const studentDoc of studentsToCreate) {
+                    await studentDoc.save({ session });
+                }
+            } catch (error) {
+                if (!session) {
+                    // Roll back manually when transactions are unavailable
+                    await Student.deleteMany({ user: { $in: usersToCreate.map((u) => u._id) } });
+                    await User.deleteMany({ _id: { $in: usersToCreate.map((u) => u._id) } });
+                }
+                throw error;
+            }
+        });
     } catch (error) {
-        if (session && session.inTransaction()) {
-            await session.abortTransaction();
-        }
-        serviceErrors.push({ row: '-', field: 'Database', message: 'Internal transaction error occurred while creating records.' });
+        console.error('Bulk student import failed:', error.message);
+        const message = error.code === 11000
+            ? 'A duplicate value was detected while saving. No students were imported.'
+            : (error.name === 'ValidationError' ? error.message : 'Database error occurred while creating records. No students were imported.');
+        serviceErrors.push({ row: '-', field: 'Database', message });
         return { imported: 0, failed: 1, serviceErrors };
-    } finally {
-        if (session) {
-            session.endSession();
-        }
     }
 
-    return { imported: totalRows, failed: 0, serviceErrors: [] };
+    return { imported: studentsToCreate.length, failed: 0, serviceErrors: [], credentials };
+};
+
+/**
+ * Academic-year transition: move students of one class/section to the next class,
+ * or mark final-year students as GRADUATED (their logins are deactivated).
+ */
+const promoteStudents = async ({ fromClass, fromSection, toClass, toSection, studentIds, action = 'PROMOTE' }) => {
+    if (!fromClass) throw new AppError('fromClass is required', 400);
+    if (!['PROMOTE', 'GRADUATE'].includes(action)) throw new AppError('action must be PROMOTE or GRADUATE', 400);
+    if (action === 'PROMOTE' && !toClass) throw new AppError('toClass is required to promote', 400);
+    if (action === 'PROMOTE' && String(toClass) === String(fromClass) && (!toSection || String(toSection).toUpperCase() === String(fromSection || '').toUpperCase())) {
+        throw new AppError('Target class/section must differ from the source', 400);
+    }
+
+    const filter = { class: String(fromClass), status: 'ACTIVE' };
+    if (fromSection) filter.section = String(fromSection).toUpperCase();
+    if (Array.isArray(studentIds) && studentIds.length) {
+        const valid = studentIds.filter((id) => mongoose.Types.ObjectId.isValid(id));
+        if (valid.length !== studentIds.length) throw new AppError('Invalid student ID in selection', 400);
+        filter._id = { $in: valid };
+    }
+    const students = await Student.find(filter).select('_id user section').lean();
+    if (!students.length) throw new AppError('No active students match the selection', 404);
+
+    await runInTransaction(async (session) => {
+        if (action === 'GRADUATE') {
+            await Student.updateMany({ _id: { $in: students.map((s) => s._id) } }, { $set: { status: 'GRADUATED' } }, { session });
+            await User.updateMany({ _id: { $in: students.map((s) => s.user) } }, { $set: { isActive: false } }, { session });
+        } else {
+            const update = { class: String(toClass) };
+            if (toSection) update.section = String(toSection).toUpperCase();
+            await Student.updateMany({ _id: { $in: students.map((s) => s._id) } }, { $set: update }, { session });
+        }
+    });
+
+    return { action, affected: students.length };
+};
+
+// Lifecycle status change (e.g. TRANSFERRED / withdrawn). Only ACTIVE students keep login access.
+const setStudentLifecycleStatus = async (id, status) => {
+    const { STUDENT_STATUS_VALUES } = require('../constants/studentStatus');
+    if (!STUDENT_STATUS_VALUES.includes(status)) {
+        throw new AppError(`status must be one of ${STUDENT_STATUS_VALUES.join(', ')}`, 400);
+    }
+    const student = await getStudentById(id);
+    await Student.updateOne({ _id: student._id }, { $set: { status } });
+    await User.updateOne({ _id: student.user._id || student.user }, { $set: { isActive: status === 'ACTIVE' } });
+    return getStudentById(student._id.toString());
 };
 
 module.exports = {
+    setStudentLifecycleStatus,
+    promoteStudents,
     createStudentAccount,
     generateTempPassword,
     getStudentsList,

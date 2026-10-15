@@ -1,6 +1,19 @@
 const mongoose = require('mongoose');
 const Notice = require('../models/Notice');
 const AppError = require('../utils/AppError');
+const User = require('../models/User');
+const { notifyUsers, userIdsForClass, userIdsForRoles } = require('./notificationService');
+
+const audienceUserIds = async (notice) => {
+    switch (notice.audience) {
+        case 'ALL': return User.find({ isActive: true, role: { $ne: 'ADMIN' } }).distinct('_id');
+        case 'TEACHERS': return userIdsForRoles(['TEACHER']);
+        case 'STUDENTS': return [...await userIdsForRoles(['STUDENT']), ...await userIdsForRoles(['PARENT'])];
+        case 'SPECIFIC_CLASS': return userIdsForClass(notice.targetClass, null);
+        case 'SPECIFIC_SECTION': return userIdsForClass(notice.targetClass, notice.targetSection);
+        default: return [];
+    }
+};
 
 const createNotice = async (data, userId) => {
     const { title, content, category, priority, audience, targetClass, targetSection, expiresAt } = data;
@@ -105,9 +118,18 @@ const publishNotice = async (id) => {
     const notice = await Notice.findById(id);
     if (!notice) throw new AppError('Notice not found', 404);
 
+    const wasPublished = notice.status === 'PUBLISHED';
     notice.status = 'PUBLISHED';
     notice.publishedAt = new Date();
     await notice.save();
+    if (!wasPublished) {
+        await notifyUsers(await audienceUserIds(notice), {
+            type: 'NOTICE',
+            title: notice.title,
+            message: notice.content.slice(0, 200),
+            link: '/notifications',
+        });
+    }
     return notice;
 };
 

@@ -4,6 +4,20 @@ const Teacher = require('../models/Teacher');
 const AttendanceAudit = require('../models/AttendanceAudit');
 const AppError = require('../utils/AppError');
 const mongoose = require('mongoose');
+const { notifyUsers, userIdsForStudents } = require('./notificationService');
+
+// Tell students (and their parents) when they are marked absent
+const notifyAbsences = async (records, date) => {
+    const absentIds = records.filter((r) => r.status === 'ABSENT').map((r) => r.student);
+    if (!absentIds.length) return;
+    const recipients = await userIdsForStudents(absentIds);
+    await notifyUsers(recipients, {
+        type: 'ATTENDANCE',
+        title: 'Absence recorded',
+        message: `Marked absent on ${new Date(date).toISOString().slice(0, 10)}.`,
+        link: '/student/attendance',
+    });
+};
 
 const createAttendance = async (userId, attendanceData) => {
     const { student, date, status, remarks } = attendanceData;
@@ -54,7 +68,9 @@ const createAttendance = async (userId, attendanceData) => {
 };
 
 const getAttendances = async (query = {}) => {
-    const { page = 1, limit = 10, student, date, status } = query;
+    const page = Math.max(parseInt(query.page, 10) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(query.limit, 10) || 10, 1), 100);
+    const { student, date, status } = query;
     const skip = (page - 1) * limit;
 
     let filter = {};
@@ -351,6 +367,7 @@ const createBulkAttendance = async (userId, bulkData) => {
         student: doc.student
     }));
     await AttendanceAudit.insertMany(audits, { ordered: false });
+    await notifyAbsences(inserted, normalizedDate);
 
     return inserted;
 };
@@ -668,8 +685,8 @@ const updateTeacherAttendance = async (userId, attendanceId, status) => {
 
 const getAdminAttendanceReport = async (queryOpts = {}) => {
     const { startDate, endDate, status, search } = queryOpts;
-    const page = parseInt(queryOpts.page, 10) || 1;
-    const limit = parseInt(queryOpts.limit, 10) || 10;
+    const page = Math.max(parseInt(queryOpts.page, 10) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(queryOpts.limit, 10) || 10, 1), 100);
 
     // Explicit static string conversion to prevent NoSQL object injection
     const classFilter = queryOpts.class ? String(queryOpts.class) : undefined;
@@ -816,8 +833,8 @@ const getAdminAttendanceReport = async (queryOpts = {}) => {
 
 const getAdminAttendanceRecords = async (queryOpts = {}) => {
     const { startDate, endDate, date, status, search } = queryOpts;
-    const page = parseInt(queryOpts.page, 10) || 1;
-    const limit = parseInt(queryOpts.limit, 10) || 10;
+    const page = Math.max(parseInt(queryOpts.page, 10) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(queryOpts.limit, 10) || 10, 1), 100);
 
     const classFilter = queryOpts.class ? String(queryOpts.class) : undefined;
     const sectionFilter = queryOpts.section ? String(queryOpts.section) : undefined;

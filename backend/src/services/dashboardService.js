@@ -11,10 +11,15 @@ const TransportAllocation = require('../models/TransportAllocation');
 const Notice = require('../models/Notice');
 const User = require('../models/User');
 const Exam = require('../models/Exam');
-const Result = require('../models/Result');
 const Message = require('../models/Message');
 const Conversation = require('../models/Conversation');
 const Timetable = require('../models/Timetable');
+const ParentProfile = require('../models/ParentProfile');
+const AcademicYear = require('../models/AcademicYear');
+const HomeworkSubmission = require('../models/HomeworkSubmission');
+const Event = require('../models/Event');
+const { outstanding: feeOutstanding } = require('../utils/feeMath');
+const AppError = require('../utils/AppError');
 
 const getAdminMetrics = async (filters = {}) => {
     let { class: className, section } = filters;
@@ -29,8 +34,7 @@ const getAdminMetrics = async (filters = {}) => {
         matchingStudentIds = students.map(s => s._id);
     }
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const { start: today, end: tomorrow } = getUtcDayRange();
 
     const promises = [];
 
@@ -61,7 +65,7 @@ const getAdminMetrics = async (filters = {}) => {
     );
 
     // 3. Attendance (Today)
-    const attendanceQuery = { date: { $gte: today } };
+    const attendanceQuery = { date: { $gte: today, $lt: tomorrow } };
     if (matchingStudentIds !== null) {
         attendanceQuery.student = { $in: matchingStudentIds };
     }
@@ -209,134 +213,285 @@ const getAdminMetrics = async (filters = {}) => {
     };
 };
 
+// Attendance dates are stored at 00:00 UTC, so "today" must be computed in UTC too
+const getUtcDayRange = () => {
+    const start = new Date();
+    start.setUTCHours(0, 0, 0, 0);
+    const end = new Date(start);
+    end.setUTCDate(end.getUTCDate() + 1);
+    return { start, end };
+};
+
+const getTodayName = () => new Date().toLocaleString('en-US', { weekday: 'long' }).toUpperCase();
+
+const examScopeFilter = (className, section) => ({
+    class: className,
+    $or: [{ section }, { section: { $in: ['', null] } }, { section: { $exists: false } }],
+});
+
+const publishedNoticeWindow = () => ({
+    status: 'PUBLISHED',
+    $or: [
+        { expiresAt: { $exists: false } },
+        { expiresAt: null },
+        { expiresAt: { $gt: new Date() } },
+    ],
+});
+
+const buildRecentMessages = async (userId) => {
+    const conversationIds = await Conversation.find({ participants: userId }).distinct('_id');
+    if (!conversationIds.length) {
+        return { unreadCount: 0, recent: [] };
+    }
+
+    const unreadFilter = {
+        conversation: { $in: conversationIds },
+        sender: { $ne: userId },
+        readBy: { $ne: userId },
+    };
+
+    const [unreadCount, unreadMessages] = await Promise.all([
+        Message.countDocuments(unreadFilter),
+        Message.find(unreadFilter).sort({ createdAt: -1 }).limit(3).lean(),
+    ]);
+
+    const senderIds = [...new Set(unreadMessages.map((m) => String(m.sender)))];
+    const [users, students, teachers, parents] = await Promise.all([
+        User.find({ _id: { $in: senderIds } }).select('role loginId').lean(),
+        Student.find({ user: { $in: senderIds } }).select('user firstName lastName').lean(),
+        Teacher.find({ user: { $in: senderIds } }).select('user firstName lastName').lean(),
+        ParentProfile.find({ user: { $in: senderIds } }).select('user firstName lastName').lean(),
+    ]);
+    const names = new Map();
+    users.forEach((u) => names.set(String(u._id), u.role === 'ADMIN' ? 'Administrator' : u.loginId));
+    [...students, ...teachers, ...parents].forEach((p) => {
+        const name = `${p.firstName || ''} ${p.lastName || ''}`.trim();
+        if (name) names.set(String(p.user), name);
+    });
+
+    return {
+        unreadCount,
+        recent: unreadMessages.map((m) => ({
+            _id: m._id,
+            conversation: m.conversation,
+            sender: names.get(String(m.sender)) || 'Unknown',
+            content: m.content,
+            createdAt: m.createdAt,
+            unread: true,
+        })),
+    };
+};
+
+const buildLibrarySummary = async (requesterId, requesterModel) => {
+    const activeFilter = { requesterId, requesterModel, status: { $in: ['ISSUED', 'OVERDUE'] } };
+    const [issuedCount, dueCount, nextIssue] = await Promise.all([
+        BookIssue.countDocuments(activeFilter),
+        BookIssue.countDocuments({ ...activeFilter, dueDate: { $lt: new Date() } }),
+        BookIssue.findOne(activeFilter).sort({ dueDate: 1 }).lean(),
+    ]);
+    return {
+        hasBooks: issuedCount > 0,
+        issuedCount,
+        dueCount,
+        // kept for backwards compatibility with older clients
+        activeIssues: issuedCount,
+        nextReturnDate: nextIssue ? nextIssue.dueDate : null,
+    };
+};
+
+// ---- Student dashboard ----------------------------------------------------
+// Everything is scoped to the student linked to the authenticated user; the
+// client never passes a student id.
+
+// Homework is due at the end of its due date (same rule as submissions)
+const homeworkDeadline = (dueDate) => {
+    if (!dueDate) return null;
+    const end = new Date(dueDate);
+    end.setUTCHours(23, 59, 59, 999);
+    return end;
+};
+
+const truncate = (text, max = 160) => {
+    const clean = String(text || '').replace(/\s+/g, ' ').trim();
+    return clean.length > max ? `${clean.slice(0, max - 1).trimEnd()}…` : clean;
+};
+
+const studentNoticeFilter = (className, section) => ({
+    ...publishedNoticeWindow(),
+    $and: [{
+        $or: [
+            { audience: { $in: ['ALL', 'STUDENTS'] } },
+            { audience: 'SPECIFIC_CLASS', targetClass: className },
+            { audience: 'SPECIFIC_SECTION', targetClass: className, targetSection: section },
+        ],
+    }],
+});
+
 const getStudentMetrics = async (userId) => {
     const student = await Student.findOne({ user: userId }).lean();
     if (!student) {
-        throw new Error('Student record not found for this user');
+        throw new AppError('Student record not found for this user', 404);
     }
 
     const { _id: studentId, class: className, section } = student;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const { start: todayStart, end: todayEnd } = getUtcDayRange();
+    const now = new Date();
 
-    const promises = [];
+    // Same refresh the fee pages run, so overdue status and late charges are current
+    await require('./feeService').refreshOverdueStatuses();
 
-    // 1. Attendance
-    promises.push(
-        Attendance.countDocuments({ student: studentId, date: { $gte: today } }),
-        Attendance.countDocuments({ student: studentId, status: 'PRESENT' }),
-        Attendance.countDocuments({ student: studentId, status: 'ABSENT' })
-    );
+    const currentYear = await AcademicYear.findOne({ isCurrent: true }).select('name startDate endDate').lean();
 
-    // 2. Homework
-    promises.push(
-        Homework.countDocuments({ class: className, section: section, status: 'PUBLISHED' }),
-        Homework.find({ class: className, section: section, status: 'PUBLISHED' })
-            .sort({ dueDate: 1 })
-            .limit(3)
-            .lean()
-    );
+    // Attendance: present / (present + absent) — the rule used by the attendance
+    // pages — limited to the current academic year when one is configured.
+    const attendanceFilter = { student: studentId };
+    if (currentYear) attendanceFilter.date = { $gte: currentYear.startDate, $lte: currentYear.endDate };
 
-    // 3. Exams
-    promises.push(
-        Exam.countDocuments({ class: className, section: section, startDate: { $gt: new Date() }, status: { $in: ['PUBLISHED', 'UPCOMING'] } }),
-        Exam.findOne({ class: className, section: section, startDate: { $gt: new Date() }, status: { $in: ['PUBLISHED', 'UPCOMING'] } })
-            .sort({ startDate: 1 })
-            .lean()
-    );
+    const upcomingExamFilter = {
+        ...examScopeFilter(className, section),
+        status: { $in: ['UPCOMING', 'ACTIVE'] },
+        endDate: { $gte: todayStart },
+    };
 
-    // 4. Results
-    promises.push(
-        Result.find({ student: studentId }).sort({ createdAt: -1 }).limit(3).populate('exam', 'name').lean()
-    );
-
-    // 5. Timetable (Today)
-    const dayOfWeek = today.toLocaleString('en-US', { weekday: 'long' }).toUpperCase();
-    promises.push(
-        Timetable.find({ class: className, section: section, dayOfWeek })
-            .populate('subject', 'name')
-            .populate('teacher', 'firstName lastName')
-            .sort({ startTime: 1 })
-            .lean()
-    );
-
-    // 6. Fees
-    promises.push(
-        FeeRecord.aggregate([
-            { $match: { student: studentId } },
-            {
-                $group: {
-                    _id: null,
-                    totalPending: {
-                        $sum: {
-                            $cond: [{ $in: ['$status', ['PENDING', 'PARTIAL', 'OVERDUE']] }, { $subtract: ['$amountDue', '$amountPaid'] }, 0]
-                        }
-                    }
-                }
-            }
-        ]).then(res => res[0]?.totalPending || 0)
-    );
-
-    // 7. Library
-    promises.push(
-        BookIssue.countDocuments({ student: studentId, status: 'ISSUED' }),
-        BookIssue.findOne({ student: studentId, status: 'ISSUED' })
-            .sort({ dueDate: 1 })
-            .lean()
-    );
-
-    // 8. Leave
-    promises.push(
-        LeaveRequest.countDocuments({ student: studentId, status: 'PENDING' }),
-        LeaveRequest.countDocuments({ student: studentId, status: 'APPROVED' }),
-        LeaveRequest.countDocuments({ student: studentId, status: 'REJECTED' })
-    );
-
-    // 9. Transport
-    promises.push(
-        TransportAllocation.findOne({ student: studentId, status: 'ACTIVE' })
-            .populate('route', 'name stopName')
-            .lean()
-    );
-
-    // 10. Notices (For student role / class)
-    promises.push(
-        Notice.find({
-            $or: [
-                { targetAudience: 'ALL' },
-                { targetAudience: 'STUDENTS' }
-            ]
-        }).sort({ createdAt: -1 }).limit(3).lean()
-    );
-
-    // 11. Messages
-    promises.push(
-        Conversation.find({ participants: userId }).distinct('_id').then(conversationIds => {
-            if (!conversationIds.length) return 0;
-            return Message.countDocuments({
-                conversation: { $in: conversationIds },
-                sender: { $ne: userId },
-                readBy: { $ne: userId }
-            });
-        })
-    );
+    const timetableFilter = { class: className, section, dayOfWeek: getTodayName(), status: 'ACTIVE' };
+    if (currentYear) timetableFilter.academicSession = currentYear.name;
 
     const [
         attendanceTodayRecord, presentCount, absentCount,
-        pendingHomeworkCount, latestHomework,
-        upcomingExamsCount, nextExam,
-        recentResults,
+        homeworkItems,
+        upcomingExams,
         todayTimetable,
-        feePendingAmount,
-        activeBookIssuesCount, nextBookReturn,
-        pendingLeaves, approvedLeaves, rejectedLeaves,
-        transportAllocation,
+        openFeeRecords,
+        upcomingEvents,
         recentNotices,
-        unreadMessagesCount
-    ] = await Promise.all(promises);
+    ] = await Promise.all([
+        Attendance.findOne({ student: studentId, date: { $gte: todayStart, $lt: todayEnd } }).select('status').lean(),
+        Attendance.countDocuments({ ...attendanceFilter, status: 'PRESENT' }),
+        Attendance.countDocuments({ ...attendanceFilter, status: 'ABSENT' }),
 
-    const totalAttendanceExpected = presentCount + absentCount;
-    const attendancePercentage = totalAttendanceExpected > 0 ? Math.round((presentCount / totalAttendanceExpected) * 100) : null;
+        Homework.find({ class: className, section, status: 'PUBLISHED' })
+            .select('title subject dueDate')
+            .sort({ dueDate: 1 })
+            .lean(),
+
+        Exam.find(upcomingExamFilter).select('name type startDate endDate status').sort({ startDate: 1 }).lean(),
+
+        Timetable.find(timetableFilter)
+            .populate('subject', 'name')
+            .populate('teacher', 'firstName lastName')
+            .sort({ startTime: 1 })
+            .lean(),
+
+        FeeRecord.find({ studentId, status: { $in: ['PENDING', 'PARTIAL', 'OVERDUE'] } })
+            .select('amountDue amountPaid discount lateFee lateFeeWaived dueDate status')
+            .lean(),
+
+        Event.find({
+            status: 'PUBLISHED',
+            targetAudience: { $in: ['ALL', 'STUDENTS'] },
+            eventDate: { $gte: todayStart },
+        }).select('title eventType eventDate startTime').sort({ eventDate: 1 }).limit(5).lean(),
+
+        Notice.find(studentNoticeFilter(className, section))
+            .select('title content category priority publishedAt createdAt')
+            .sort({ publishedAt: -1, createdAt: -1 })
+            .limit(3)
+            .lean(),
+    ]);
+
+    // Homework: pending = not submitted (or returned for changes) and not past its due date
+    const submissions = homeworkItems.length
+        ? await HomeworkSubmission.find({ student: studentId, homework: { $in: homeworkItems.map((h) => h._id) } })
+            .select('homework status')
+            .lean()
+        : [];
+    const submissionByHomework = new Map(submissions.map((s) => [String(s.homework), s]));
+
+    const actionableHomework = [];
+    let overdueHomework = 0;
+    homeworkItems.forEach((h) => {
+        const submission = submissionByHomework.get(String(h._id));
+        const needsWork = !submission || submission.status === 'RETURNED';
+        if (!needsWork) return;
+        const deadline = homeworkDeadline(h.dueDate);
+        if (deadline && deadline < now) {
+            overdueHomework += 1;
+            return;
+        }
+        actionableHomework.push({
+            _id: h._id,
+            title: h.title,
+            subject: h.subject || null,
+            dueDate: h.dueDate || null,
+            status: submission ? 'RETURNED' : 'NOT_SUBMITTED',
+        });
+    });
+    // Items with a due date first (soonest first), undated ones last
+    actionableHomework.sort((a, b) => {
+        if (!a.dueDate) return b.dueDate ? 1 : 0;
+        if (!b.dueDate) return -1;
+        return new Date(a.dueDate) - new Date(b.dueDate);
+    });
+
+    // Exams: ongoing if already started, otherwise upcoming
+    const exams = upcomingExams.map((e) => ({
+        _id: e._id,
+        name: e.name,
+        type: e.type,
+        startDate: e.startDate,
+        endDate: e.endDate,
+        ongoing: e.status === 'ACTIVE' || new Date(e.startDate) < todayStart,
+    }));
+
+    // Fees: shared fee arithmetic (concession + late charge − payments recorded by staff)
+    const outstandingRecords = openFeeRecords
+        .map((r) => ({ ...r, outstanding: feeOutstanding(r) }))
+        .filter((r) => r.outstanding > 0);
+    const outstandingAmount = Math.round(outstandingRecords.reduce((sum, r) => sum + r.outstanding, 0) * 100) / 100;
+    const nextFeeDue = outstandingRecords
+        .filter((r) => r.dueDate)
+        .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate))[0];
+
+    // Deadlines: homework, exams and student events — nothing already past
+    const deadlines = [
+        ...actionableHomework.filter((h) => h.dueDate).map((h) => ({
+            kind: 'HOMEWORK',
+            _id: h._id,
+            title: h.title,
+            subtitle: h.subject,
+            date: h.dueDate,
+            status: h.status,
+            link: '/homework',
+        })),
+        ...exams.map((e) => ({
+            kind: 'EXAM',
+            _id: e._id,
+            title: e.name,
+            subtitle: null,
+            endDate: e.endDate,
+            date: e.startDate,
+            status: e.ongoing ? 'ONGOING' : 'UPCOMING',
+            link: '/student/exams',
+        })),
+        ...upcomingEvents.map((ev) => ({
+            kind: 'EVENT',
+            _id: ev._id,
+            title: ev.title,
+            subtitle: ev.startTime || null,
+            date: ev.eventDate,
+            status: 'SCHEDULED',
+            link: '/events',
+        })),
+    ]
+        .sort((a, b) => {
+            // Ongoing exams first, then by date
+            if (a.status === 'ONGOING' && b.status !== 'ONGOING') return -1;
+            if (b.status === 'ONGOING' && a.status !== 'ONGOING') return 1;
+            return new Date(a.date) - new Date(b.date);
+        })
+        .slice(0, 5);
+
+    const totalMarked = presentCount + absentCount;
 
     return {
         student: {
@@ -345,53 +500,68 @@ const getStudentMetrics = async (userId) => {
             studentId: student.studentId,
             class: student.class,
             section: student.section,
+            rollNumber: student.rollNumber || null,
+            academicYear: currentYear ? currentYear.name : null,
         },
         attendance: {
-            percentage: attendancePercentage,
+            percentage: totalMarked > 0 ? Math.round((presentCount / totalMarked) * 100) : null,
             present: presentCount,
             absent: absentCount,
+            period: currentYear ? `Academic year ${currentYear.name}` : 'All recorded days',
+            today: attendanceTodayRecord ? attendanceTodayRecord.status : null,
         },
         homework: {
-            pending: pendingHomeworkCount,
-            latest: latestHomework,
+            pending: actionableHomework.length,
+            overdue: overdueHomework,
+            next: actionableHomework[0] || null,
         },
         examinations: {
-            upcomingCount: upcomingExamsCount,
-            next: nextExam,
+            upcomingCount: exams.length,
+            next: exams[0] || null,
         },
-        results: recentResults,
-        timetable: todayTimetable,
         fees: {
-            pendingAmount: feePendingAmount,
-            hasPending: feePendingAmount > 0
+            outstandingAmount,
+            hasDues: outstandingAmount > 0,
+            // kept for older clients
+            pendingAmount: outstandingAmount,
+            hasPending: outstandingAmount > 0,
+            overdueCount: outstandingRecords.filter((r) => r.status === 'OVERDUE').length,
+            nextDueDate: nextFeeDue ? nextFeeDue.dueDate : null,
         },
-        library: {
-            activeIssues: activeBookIssuesCount,
-            nextReturnDate: nextBookReturn ? nextBookReturn.dueDate : null,
+        timetable: {
+            day: getTodayName(),
+            classes: todayTimetable.map((t) => ({
+                _id: t._id,
+                startTime: t.startTime,
+                endTime: t.endTime,
+                subject: t.subject?.name || null,
+                teacher: t.teacher ? `${t.teacher.firstName || ''} ${t.teacher.lastName || ''}`.trim() : null,
+                room: t.room || null,
+            })),
         },
-        leave: {
-            pending: pendingLeaves,
-            approved: approvedLeaves,
-            rejected: rejectedLeaves,
+        deadlines,
+        notices: {
+            recent: recentNotices.map((n) => ({
+                _id: n._id,
+                title: n.title,
+                category: n.category,
+                priority: n.priority,
+                date: n.publishedAt || n.createdAt,
+                preview: truncate(n.content),
+            })),
         },
-        transport: transportAllocation,
-        notices: recentNotices,
-        messages: {
-            unreadCount: unreadMessagesCount
-        }
     };
 };
 
 const getTeacherMetrics = async (userId) => {
     const teacher = await Teacher.findOne({ user: userId }).lean();
     if (!teacher) {
-        throw new Error('Teacher record not found for this user');
+        throw new AppError('Teacher record not found for this user', 404);
     }
 
     const { _id: teacherId, assignedClass, assignedSection } = teacher;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const dayOfWeek = today.toLocaleString('en-US', { weekday: 'long' }).toUpperCase();
+    const { start: today, end: tomorrow } = getUtcDayRange();
+    const dayOfWeek = getTodayName();
 
     const promises = [];
 
@@ -407,8 +577,8 @@ const getTeacherMetrics = async (userId) => {
             const studentIds = students.map(s => s._id);
             if (!studentIds.length) return { present: 0, absent: 0 };
             return Promise.all([
-                Attendance.countDocuments({ student: { $in: studentIds }, date: { $gte: today }, status: 'PRESENT' }),
-                Attendance.countDocuments({ student: { $in: studentIds }, date: { $gte: today }, status: 'ABSENT' })
+                Attendance.countDocuments({ student: { $in: studentIds }, date: { $gte: today, $lt: tomorrow }, status: 'PRESENT' }),
+                Attendance.countDocuments({ student: { $in: studentIds }, date: { $gte: today, $lt: tomorrow }, status: 'ABSENT' })
             ]).then(([present, absent]) => ({ present, absent }));
         })
     );
@@ -421,13 +591,13 @@ const getTeacherMetrics = async (userId) => {
 
     // 4. Upcoming Exams
     promises.push(
-        Exam.countDocuments({ class: assignedClass, section: assignedSection, startDate: { $gt: new Date() }, status: { $in: ['PUBLISHED', 'UPCOMING'] } }),
-        Exam.findOne({ class: assignedClass, section: assignedSection, startDate: { $gt: new Date() }, status: { $in: ['PUBLISHED', 'UPCOMING'] } }).sort({ startDate: 1 }).lean()
+        Exam.countDocuments({ ...examScopeFilter(assignedClass, assignedSection), startDate: { $gt: new Date() }, status: { $in: ['PUBLISHED', 'UPCOMING'] } }),
+        Exam.findOne({ ...examScopeFilter(assignedClass, assignedSection), startDate: { $gt: new Date() }, status: { $in: ['PUBLISHED', 'UPCOMING'] } }).sort({ startDate: 1 }).lean()
     );
 
     // 5. Today's Timetable
     promises.push(
-        Timetable.find({ teacher: teacherId, dayOfWeek })
+        Timetable.find({ teacher: teacherId, dayOfWeek, status: 'ACTIVE' })
             .populate('subject', 'name')
             .sort({ startTime: 1 })
             .lean()
@@ -446,11 +616,9 @@ const getTeacherMetrics = async (userId) => {
     // 7. Recent Notices
     promises.push(
         Notice.find({
-            $or: [
-                { targetAudience: 'ALL' },
-                { targetAudience: 'TEACHERS' }
-            ]
-        }).sort({ createdAt: -1 }).limit(3).lean()
+            ...publishedNoticeWindow(),
+            $and: [{ $or: [{ audience: { $in: ['ALL', 'TEACHERS'] } }] }],
+        }).sort({ publishedAt: -1, createdAt: -1 }).limit(3).lean()
     );
 
     // 8. Leave Management
@@ -461,19 +629,10 @@ const getTeacherMetrics = async (userId) => {
     );
 
     // 9. Messages
-    promises.push(
-        Conversation.find({ participants: userId }).distinct('_id').then(async conversationIds => {
-            if (!conversationIds.length) return { unreadCount: 0, recent: [] };
-            const unreadCount = await Message.countDocuments({
-                conversation: { $in: conversationIds },
-                sender: { $ne: userId },
-                readBy: { $ne: userId }
-            });
-            // Fetch recent messages logically (requires grouping by conversation, but we'll approximate)
-            // Just return empty recent for now or minimal
-            return { unreadCount, recent: [] };
-        })
-    );
+    promises.push(buildRecentMessages(userId));
+
+    // 10. Library (books issued to this teacher)
+    promises.push(buildLibrarySummary(teacherId, 'Teacher'));
 
     const [
         totalStudents, activeStudents,
@@ -484,7 +643,8 @@ const getTeacherMetrics = async (userId) => {
         myClasses,
         recentNotices,
         pendingLeaves, approvedLeaves, rejectedLeaves,
-        messagesData
+        messagesData,
+        librarySummary
     ] = await Promise.all(promises);
 
     if (myClasses && myClasses.length > 0) {
@@ -529,7 +689,8 @@ const getTeacherMetrics = async (userId) => {
         },
         notices: recentNotices,
         messages: messagesData,
-        library: { hasBooks: false },
+        library: librarySummary,
+        // Transport allocations are only modelled for students
         transport: { allocation: null }
     };
 };

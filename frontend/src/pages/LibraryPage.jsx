@@ -12,11 +12,18 @@ import {
 } from '../services/libraryApi';
 import Modal from '../components/Modal';
 import Button from '../components/Button';
+import StudentPicker from '../components/common/StudentPicker';
+import { getTeachers } from '../services/teacherApi';
+import LibraryReport from '../components/library/LibraryReport';
+import { libraryExtraApi } from '../services/moduleApi';
+
+const rupees = (value) => `₹${Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
 
 function LibraryPage() {
     const { user } = useAuth();
 
-    const isAdmin = user?.role === 'ADMIN';
+    // Library staff: administrators and librarians manage the catalogue and lending
+    const isAdmin = user?.role === 'ADMIN' || user?.role === 'LIBRARIAN';
 
     // Tabs: 'CATALOGUE' | 'ISSUES'
     const [activeTab, setActiveTab] = useState('CATALOGUE');
@@ -35,11 +42,18 @@ function LibraryPage() {
     // Issue Filter / Search states
     const [issuePage, setIssuePage] = useState(1);
     const [issueTotalPages, setIssueTotalPages] = useState(1);
+    const [issueStatus, setIssueStatus] = useState('');
+    const [notice, setNotice] = useState('');
 
     // Modals
     const [isBookModalOpen, setIsBookModalOpen] = useState(false);
     const [isIssueModalOpen, setIsIssueModalOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [issueError, setIssueError] = useState(null);
+    const [issueBook, setIssueBook] = useState(null);
+    const [issueStudent, setIssueStudent] = useState(null);
+    const [bookOptions, setBookOptions] = useState([]);
+    const [teacherOptions, setTeacherOptions] = useState([]);
 
     // Track Edit
     const [editingBook, setEditingBook] = useState(null);
@@ -85,7 +99,7 @@ function LibraryPage() {
             setLoading(true);
             setError(null);
 
-            const res = await getIssues({ page, limit: 10 });
+            const res = await getIssues({ page, limit: 10, status: issueStatus || undefined });
             setIssues(res.data);
             setIssuePage(res.pagination.page);
             setIssueTotalPages(res.pagination.totalPages);
@@ -103,11 +117,11 @@ function LibraryPage() {
                 fetchBooks(1);
             }, 500);
             return () => clearTimeout(delayDebounceFn);
-        } else {
+        } else if (activeTab === 'ISSUES') {
             fetchIssues(1);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [activeTab, searchQuery]);
+    }, [activeTab, searchQuery, issueStatus]);
 
 
     // -------------------------------------------------------------
@@ -178,10 +192,25 @@ function LibraryPage() {
     // -------------------------------------------------------------
     // ISSUE ACTIONS (ADMIN)
     // -------------------------------------------------------------
-    const handleOpenIssueModal = (book = null) => {
+    const handleOpenIssueModal = async (book = null) => {
         if (!isAdmin) return;
-        setIssueForm({ bookId: book ? book._id : '', requesterId: '', requesterModel: 'Student', dueDate: '' });
+        // Default due date: two weeks from today
+        const due = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        setIssueForm({ bookId: book ? book._id : '', requesterId: '', requesterModel: 'Student', dueDate: due });
+        setIssueBook(book);
+        setIssueStudent(null);
+        setIssueError(null);
         setIsIssueModalOpen(true);
+        try {
+            const [bookData, teacherData] = await Promise.all([
+                book ? Promise.resolve(null) : getBooks({ limit: 100 }),
+                getTeachers({ limit: 100 }),
+            ]);
+            if (bookData) setBookOptions((bookData.data || []).filter((b) => b.availableCopies > 0));
+            setTeacherOptions(teacherData?.teachers || []);
+        } catch (err) {
+            setIssueError(err.response?.data?.message || 'Unable to load books or teachers.');
+        }
     };
 
     const handleIssueSubmit = async (e) => {
@@ -199,7 +228,7 @@ function LibraryPage() {
                 fetchBooks(bookPage);
             }
         } catch (err) {
-            setError(err.response?.data?.message || 'Failed to issue book.');
+            setIssueError(err.response?.data?.message || 'Failed to issue book.');
         } finally {
             setIsSubmitting(false);
         }
@@ -211,7 +240,9 @@ function LibraryPage() {
 
         setIsSubmitting(true);
         try {
-            await returnBook(issueId);
+            const response = await returnBook(issueId);
+            const returned = response?.data || response;
+            setNotice(returned?.fineAmount > 0 ? `Book returned late. Fine of ${rupees(returned.fineAmount)} is pending.` : 'Book returned.');
             fetchIssues(issuePage);
         } catch (err) {
             setError(err.response?.data?.message || 'Failed to return book.');
@@ -220,6 +251,21 @@ function LibraryPage() {
         }
     };
 
+
+    const handleSettleFine = async (issue, action) => {
+        if (!isAdmin) return;
+        if (!window.confirm(`${action === 'PAID' ? 'Record payment of' : 'Waive'} the ${rupees(issue.fineAmount)} fine?`)) return;
+        setIsSubmitting(true);
+        try {
+            await libraryExtraApi.settleFine(issue._id, action);
+            setNotice(action === 'PAID' ? 'Fine marked as paid.' : 'Fine waived.');
+            fetchIssues(issuePage);
+        } catch (err) {
+            setError(err.response?.data?.message || 'Failed to update fine.');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
 
     // -------------------------------------------------------------
     // UI RENDERING HELPERS
@@ -274,6 +320,17 @@ function LibraryPage() {
                     >
                         {isAdmin ? 'All Issues' : 'My Issues'}
                     </button>
+                    {isAdmin && (
+                        <button
+                            onClick={() => setActiveTab('REPORT')}
+                            className={`${activeTab === 'REPORT'
+                                ? 'border-brand-500 text-brand-600'
+                                : 'border-transparent text-ink-500 hover:border-ink-300 hover:text-ink-700'
+                                } whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium`}
+                        >
+                            Reports
+                        </button>
+                    )}
                 </nav>
             </div>
 
@@ -340,16 +397,36 @@ function LibraryPage() {
                     {/* Pagination Books */}
                     {bookTotalPages > 1 && (
                         <div className="flex justify-between items-center bg-white px-4 py-3 rounded-lg border border-ink-200 shadow-sm mt-6">
-                            <button disabled={bookPage === 1} onClick={() => setBookPage(bookPage - 1)} className="text-sm text-ink-600 hover:text-ink-900 disabled:opacity-50">Previous</button>
+                            <button disabled={bookPage === 1} onClick={() => fetchBooks(bookPage - 1)} className="text-sm text-ink-600 hover:text-ink-900 disabled:opacity-50">Previous</button>
                             <span className="text-sm text-ink-500">Page {bookPage} of {bookTotalPages}</span>
-                            <button disabled={bookPage === bookTotalPages} onClick={() => setBookPage(bookPage + 1)} className="text-sm text-ink-600 hover:text-ink-900 disabled:opacity-50">Next</button>
+                            <button disabled={bookPage === bookTotalPages} onClick={() => fetchBooks(bookPage + 1)} className="text-sm text-ink-600 hover:text-ink-900 disabled:opacity-50">Next</button>
                         </div>
                     )}
                 </div>
             )}
 
+            {notice && (
+                <div className="mb-4 flex items-start justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
+                    <span>{notice}</span>
+                    <button type="button" onClick={() => setNotice('')} className="font-medium">Dismiss</button>
+                </div>
+            )}
+
+            {activeTab === 'REPORT' && isAdmin && <LibraryReport />}
+
             {activeTab === 'ISSUES' && (
                 <div className="space-y-4">
+                    <select
+                        aria-label="Filter issues by status"
+                        value={issueStatus}
+                        onChange={(e) => setIssueStatus(e.target.value)}
+                        className="block w-full rounded-md border border-ink-300 px-3 py-2 text-base text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 sm:w-60"
+                    >
+                        <option value="">All statuses</option>
+                        <option value="ISSUED">Issued</option>
+                        <option value="OVERDUE">Overdue</option>
+                        <option value="RETURNED">Returned</option>
+                    </select>
                     {loading ? (
                         <div className="flex justify-center p-12">
                             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600"></div>
@@ -367,6 +444,7 @@ function LibraryPage() {
                                         <th className="px-6 py-3 text-left text-xs font-medium text-ink-500 uppercase tracking-wider">Borrower</th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-ink-500 uppercase tracking-wider">Dates</th>
                                         <th className="px-6 py-3 text-left text-xs font-medium text-ink-500 uppercase tracking-wider">Status</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-ink-500 uppercase tracking-wider">Fine</th>
                                         {isAdmin && <th className="px-6 py-3 text-right text-xs font-medium text-ink-500 uppercase tracking-wider">Action</th>}
                                     </tr>
                                 </thead>
@@ -395,6 +473,14 @@ function LibraryPage() {
                                                     {issue.status}
                                                 </span>
                                             </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                                {issue.fineAmount > 0 ? (
+                                                    <div>
+                                                        <span className="font-medium text-ink-900">{rupees(issue.fineAmount)}</span>
+                                                        <div className={`text-xs ${issue.fineStatus === 'PENDING' ? 'text-red-600' : 'text-ink-500'}`}>{issue.fineStatus === 'PENDING' ? 'Pending' : issue.fineStatus === 'PAID' ? 'Paid' : issue.fineStatus === 'WAIVED' ? 'Waived' : ''}</div>
+                                                    </div>
+                                                ) : <span className="text-ink-400">—</span>}
+                                            </td>
                                             {isAdmin && (
                                                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                                     {issue.status !== 'RETURNED' && (
@@ -405,6 +491,12 @@ function LibraryPage() {
                                                         >
                                                             Mark Returned
                                                         </button>
+                                                    )}
+                                                    {issue.fineStatus === 'PENDING' && (
+                                                        <span className="inline-flex gap-3">
+                                                            <button disabled={isSubmitting} onClick={() => handleSettleFine(issue, 'PAID')} className="text-brand-600 hover:text-brand-900 disabled:opacity-50">Fine Paid</button>
+                                                            <button disabled={isSubmitting} onClick={() => handleSettleFine(issue, 'WAIVED')} className="text-ink-600 hover:text-ink-900 disabled:opacity-50">Waive</button>
+                                                        </span>
                                                     )}
                                                 </td>
                                             )}
@@ -417,9 +509,9 @@ function LibraryPage() {
                     {/* Pagination Issues */}
                     {issueTotalPages > 1 && (
                         <div className="flex justify-between items-center bg-white px-4 py-3 rounded-lg border border-ink-200 shadow-sm mt-6">
-                            <button disabled={issuePage === 1} onClick={() => setIssuePage(issuePage - 1)} className="text-sm text-ink-600 hover:text-ink-900 disabled:opacity-50">Previous</button>
+                            <button disabled={issuePage === 1} onClick={() => fetchIssues(issuePage - 1)} className="text-sm text-ink-600 hover:text-ink-900 disabled:opacity-50">Previous</button>
                             <span className="text-sm text-ink-500">Page {issuePage} of {issueTotalPages}</span>
-                            <button disabled={issuePage === issueTotalPages} onClick={() => setIssuePage(issuePage + 1)} className="text-sm text-ink-600 hover:text-ink-900 disabled:opacity-50">Next</button>
+                            <button disabled={issuePage === issueTotalPages} onClick={() => fetchIssues(issuePage + 1)} className="text-sm text-ink-600 hover:text-ink-900 disabled:opacity-50">Next</button>
                         </div>
                     )}
                 </div>
@@ -476,31 +568,58 @@ function LibraryPage() {
                     {/* Issue Book Modal */}
                     <Modal isOpen={isIssueModalOpen} onClose={() => setIsIssueModalOpen(false)} title="Issue Book">
                         <form onSubmit={handleIssueSubmit} className="space-y-4 pt-4">
+                            {issueError && <div className="rounded border border-red-200 bg-red-50 p-2 text-sm text-red-600">{issueError}</div>}
                             <div>
-                                <label className="block text-sm font-medium text-ink-700">Book ID *</label>
-                                <input type="text" required value={issueForm.bookId} onChange={e => setIssueForm({ ...issueForm, bookId: e.target.value })} className="mt-1 w-full rounded-md border border-ink-300 px-3 py-2 text-base text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500" placeholder="Paste Book ID exactly" />
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-ink-700">Role *</label>
-                                    <select value={issueForm.requesterModel} onChange={e => setIssueForm({ ...issueForm, requesterModel: e.target.value })} className="mt-1 w-full rounded-md border border-ink-300 px-3 py-2 text-base text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500">
-                                        <option value="Student">Student</option>
-                                        <option value="Teacher">Teacher</option>
+                                <label htmlFor="issue-book" className="block text-sm font-medium text-ink-700">Book *</label>
+                                {issueBook ? (
+                                    <div className="mt-1 rounded-md border border-ink-300 bg-ink-50 px-3 py-2 text-sm text-ink-900">
+                                        {issueBook.title} <span className="text-ink-500">· {issueBook.author} · {issueBook.availableCopies} available</span>
+                                    </div>
+                                ) : (
+                                    <select id="issue-book" required value={issueForm.bookId} onChange={e => setIssueForm({ ...issueForm, bookId: e.target.value })} className="mt-1 w-full rounded-md border border-ink-300 px-3 py-2 text-base text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500">
+                                        <option value="">Select an available book...</option>
+                                        {bookOptions.map((b) => (
+                                            <option key={b._id} value={b._id}>{b.title} — {b.author} ({b.availableCopies} available)</option>
+                                        ))}
                                     </select>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-ink-700">User ID *</label>
-                                    <input type="text" required value={issueForm.requesterId} onChange={e => setIssueForm({ ...issueForm, requesterId: e.target.value })} className="mt-1 w-full rounded-md border border-ink-300 px-3 py-2 text-base text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500" placeholder="User ID" />
+                                )}
+                            </div>
+                            <div>
+                                <label htmlFor="issue-role" className="block text-sm font-medium text-ink-700">Issue To *</label>
+                                <select id="issue-role" value={issueForm.requesterModel} onChange={e => { setIssueForm({ ...issueForm, requesterModel: e.target.value, requesterId: '' }); setIssueStudent(null); }} className="mt-1 w-full rounded-md border border-ink-300 px-3 py-2 text-base text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500">
+                                    <option value="Student">Student</option>
+                                    <option value="Teacher">Teacher</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label htmlFor="issue-requester" className="block text-sm font-medium text-ink-700">{issueForm.requesterModel} *</label>
+                                <div className="mt-1">
+                                    {issueForm.requesterModel === 'Student' ? (
+                                        <StudentPicker
+                                            id="issue-requester"
+                                            required
+                                            value={issueForm.requesterId}
+                                            selected={issueStudent}
+                                            onChange={(id, student) => { setIssueForm((prev) => ({ ...prev, requesterId: id })); setIssueStudent(student); }}
+                                        />
+                                    ) : (
+                                        <select id="issue-requester" required value={issueForm.requesterId} onChange={e => setIssueForm({ ...issueForm, requesterId: e.target.value })} className="w-full rounded-md border border-ink-300 px-3 py-2 text-base text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500">
+                                            <option value="">Select a teacher...</option>
+                                            {teacherOptions.map((t) => (
+                                                <option key={t._id} value={t._id}>{t.firstName} {t.lastName} ({t.user?.loginId || t.email})</option>
+                                            ))}
+                                        </select>
+                                    )}
                                 </div>
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-ink-700">Due Date *</label>
-                                <input type="date" required value={issueForm.dueDate} onChange={e => setIssueForm({ ...issueForm, dueDate: e.target.value })} className="mt-1 w-full rounded-md border-ink-300 focus:ring-brand-500 focus:border-brand-500 text-sm" />
+                                <input type="date" required min={new Date().toISOString().split('T')[0]} value={issueForm.dueDate} onChange={e => setIssueForm({ ...issueForm, dueDate: e.target.value })} className="mt-1 w-full rounded-md border border-ink-300 px-3 py-2 text-base text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500" />
                             </div>
 
                             <div className="mt-6 flex justify-end space-x-3">
                                 <Button type="button" variant="secondary" onClick={() => setIsIssueModalOpen(false)} disabled={isSubmitting}>Cancel</Button>
-                                <Button type="submit" disabled={isSubmitting}>
+                                <Button type="submit" disabled={isSubmitting || !issueForm.bookId || !issueForm.requesterId}>
                                     {isSubmitting ? 'Processing...' : 'Issue Book'}
                                 </Button>
                             </div>

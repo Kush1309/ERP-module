@@ -123,7 +123,8 @@ class LibraryController {
                 limit: req.query.limit,
                 requesterId: req.query.requesterId,
                 bookId: req.query.bookId,
-                status: req.query.status
+                status: req.query.status,
+                fineStatus: req.query.fineStatus
             };
 
             const result = await libraryService.getIssues(safeParams, req.user);

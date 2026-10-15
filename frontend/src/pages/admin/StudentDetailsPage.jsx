@@ -252,6 +252,7 @@ function StudentDetailsPage() {
 
             </div>
 
+
             <Modal
                 isOpen={modalConfig.isOpen}
                 onClose={() => !actionLoading && setModalConfig({ isOpen: false, type: '' })}

@@ -1,15 +1,19 @@
 const mongoose = require('mongoose');
 const Result = require('../models/Result');
+const Exam = require('../models/Exam');
 const parentService = require('./parentService');
 
 const getStudentResults = async (parentUserId, studentId, query = {}) => {
     // Validate ID and ensure ownership explicitly securely natively
     const student = await parentService.getLinkedStudentById(parentUserId, studentId);
 
-    let filters = { student: student._id };
+    // Parents, like students, only see marks of published exams
+    const publishedExamIds = await Exam.find({ status: 'PUBLISHED' }).distinct('_id');
+    let filters = { student: student._id, exam: { $in: publishedExamIds } };
 
     if (query.examId && mongoose.Types.ObjectId.isValid(query.examId)) {
-        filters.exam = query.examId;
+        const requested = String(query.examId);
+        filters.exam = publishedExamIds.some((id) => id.toString() === requested) ? requested : { $in: [] };
     }
 
     if (query.subject && mongoose.Types.ObjectId.isValid(query.subject)) {

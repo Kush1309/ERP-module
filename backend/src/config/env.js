@@ -19,6 +19,11 @@ const validateEnv = () => {
   if (process.env.JWT_SECRET.length < 32) {
     throw new Error('JWT_SECRET must be at least 32 characters long');
   }
+
+  // The placeholder from .env.example / docker-compose must never reach production
+  if (process.env.NODE_ENV === 'production' && process.env.JWT_SECRET.startsWith('change_this')) {
+    throw new Error('JWT_SECRET is still the example placeholder. Set a long random secret for production.');
+  }
 };
 
 module.exports = { validateEnv };

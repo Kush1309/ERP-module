@@ -106,13 +106,40 @@ exports.getFeeRecordById = async (req, res, next) => {
 
 exports.recordPayment = async (req, res, next) => {
     try {
-        const { paymentAmount } = req.body;
-        const record = await feeService.recordPayment(req.user, req.params.id, paymentAmount);
+        const { paymentAmount, method, reference, note } = req.body;
+        const record = await feeService.recordPayment(req.user, req.params.id, { paymentAmount, method, reference, note });
         res.status(200).json({
             success: true,
             message: 'Payment recorded successfully',
             data: record
         });
+    } catch (error) {
+        next(error);
+    }
+};
+
+exports.applyDiscount = async (req, res, next) => {
+    try {
+        const record = await feeService.applyDiscount(req.user, req.params.id, { discount: req.body.discount, reason: req.body.reason });
+        res.status(200).json({ success: true, message: 'Concession applied', data: record });
+    } catch (error) {
+        next(error);
+    }
+};
+
+exports.getReceipt = async (req, res, next) => {
+    try {
+        const data = await feeService.getReceipt(req.user, req.params.id, req.params.receiptNumber);
+        res.status(200).json({ success: true, data });
+    } catch (error) {
+        next(error);
+    }
+};
+
+exports.getFinanceSummary = async (req, res, next) => {
+    try {
+        const data = await feeService.getFinanceSummary(req.user, { feeStructureId: req.query.feeStructureId });
+        res.status(200).json({ success: true, data });
     } catch (error) {
         next(error);
     }

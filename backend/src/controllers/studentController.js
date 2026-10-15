@@ -18,6 +18,7 @@ const createStudent = asyncHandler(async (req, res) => {
         message: 'Student created successfully',
         data: {
             student: {
+                _id: result.student._id,
                 studentId: result.student.studentId,
                 loginId: result.user.loginId,
                 firstName: result.student.firstName,
@@ -214,7 +215,8 @@ const importAdminStudents = asyncHandler(async (req, res) => {
     let currentCell = '';
     let inQuotes = false;
 
-    const csvStr = csvContent.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    // Strip a UTF-8 BOM (added by Excel) so the first header is recognised
+    const csvStr = csvContent.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
     for (let i = 0; i < csvStr.length; i++) {
         let c = csvStr[i];
@@ -312,7 +314,10 @@ const importAdminStudents = asyncHandler(async (req, res) => {
         }
 
         for (const reqField of EXPECTED_HEADERS) {
-            if (!studentData[reqField] && reqField !== 'Email') {
+            // Headers are PascalCase (FirstName) while the payload is camelCase (firstName)
+            const dataKey = reqField.charAt(0).toLowerCase() + reqField.slice(1);
+            const value = studentData[dataKey];
+            if (value === undefined || value === null || String(value).trim() === '') {
                 errors.push({ row: rowNum, field: reqField, message: `${reqField} is required.` });
                 rowHasError = true;
             }
@@ -356,7 +361,7 @@ const importAdminStudents = asyncHandler(async (req, res) => {
         });
     }
 
-    const { imported, failed, serviceErrors } = await studentService.bulkImportStudents(studentDataArray, dataRows.length);
+    const { imported, failed, serviceErrors, credentials } = await studentService.bulkImportStudents(studentDataArray, dataRows.length);
 
     if (failed > 0) {
         return res.status(400).json({
@@ -378,7 +383,9 @@ const importAdminStudents = asyncHandler(async (req, res) => {
             totalRows: dataRows.length,
             imported,
             failed: 0,
-            errors: []
+            errors: [],
+            // Temporary passwords are only returned once so the admin can hand them out
+            credentials: credentials || []
         }
     });
 });

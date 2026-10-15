@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 
-function Modal({ isOpen, onClose, title, children }) {
+function Modal({ isOpen, onClose, title, children, size = 'max-w-md' }) {
     useEffect(() => {
         if (isOpen) {
             document.body.style.overflow = 'hidden';
@@ -20,7 +20,7 @@ function Modal({ isOpen, onClose, title, children }) {
                 className="fixed inset-0 bg-ink-900/40 backdrop-blur-sm transition-opacity"
                 onClick={onClose}
             />
-            <div className="relative z-10 w-full max-w-md transform overflow-hidden rounded-xl bg-white p-6 shadow-2xl transition-all">
+            <div className={`relative z-10 max-h-[90vh] w-full ${size} transform overflow-y-auto rounded-xl bg-white p-6 shadow-2xl transition-all`}>
                 {title && (
                     <h3 className="mb-4 text-lg font-semibold text-ink-900">
                         {title}

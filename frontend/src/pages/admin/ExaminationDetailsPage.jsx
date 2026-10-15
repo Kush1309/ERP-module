@@ -68,9 +68,9 @@ export default function ExaminationDetailsPage() {
                     <p className="mt-1 text-sm text-ink-600">Overview of examination configurations and result mapping.</p>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-3">
-                    {/* Entrypoint explicitly for Results Management as configured by module rules */}
-                    <Button type="button" onClick={() => alert("Result management UI expansion pending next module cycle")} className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white border-0">
-                        Manage Student Results
+                    {/* Results, rankings and report cards for this examination */}
+                    <Button as={Link} to={`/admin/examinations/${exam._id}/analytics`} className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white border-0">
+                        Results &amp; Analytics
                     </Button>
                 </div>
             </div>

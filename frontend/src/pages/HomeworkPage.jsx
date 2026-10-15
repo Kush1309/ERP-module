@@ -8,6 +8,7 @@ import {
 } from '../services/homeworkApi';
 import Modal from '../components/Modal';
 import Button from '../components/Button';
+import HomeworkSubmissionPanel from '../components/homework/HomeworkSubmissionPanel';
 
 function HomeworkPage() {
     const { user } = useAuth();
@@ -351,7 +352,7 @@ function HomeworkPage() {
             </Modal>
 
             {/* View Details Modal */}
-            <Modal isOpen={!!viewOnlyHomework} onClose={() => setViewOnlyHomework(null)} title="Homework Details">
+            <Modal isOpen={!!viewOnlyHomework} onClose={() => setViewOnlyHomework(null)} title="Homework Details" size="max-w-2xl">
                 {viewOnlyHomework && (
                     <div className="space-y-4 pt-4">
                         <div>
@@ -380,6 +381,7 @@ function HomeworkPage() {
                                 </span>
                             </div>
                         )}
+                        <HomeworkSubmissionPanel homework={viewOnlyHomework} role={user?.role} />
                         <div className="mt-6 flex justify-end">
                             <Button
                                 onClick={() => setViewOnlyHomework(null)}

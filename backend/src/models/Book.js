@@ -55,14 +55,14 @@ const bookSchema = new mongoose.Schema(
 );
 
 // Indexes for searching and preventing duplicate catalogs
-bookSchema.index({ isbn: 1 }, { unique: true });
+// isbn uniqueness is declared on the field itself (unique: true)
 bookSchema.index({ title: 1 });
 bookSchema.index({ category: 1 });
 
 // Validate available copies logically against total copies
 bookSchema.pre('save', function (next) {
     if (this.availableCopies > this.totalCopies) {
-        return next(new Error('Available copies cannot logically exceed total copies.'));
+        return next(new Error('Available copies cannot exceed total copies.'));
     }
     next();
 });

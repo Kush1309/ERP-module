@@ -1,9 +1,20 @@
 const Exam = require('../models/Exam');
+const Result = require('../models/Result');
+const { notifyUsers, userIdsForClass } = require('./notificationService');
 const AppError = require('../utils/AppError');
 
+const EXAM_FIELDS = ['name', 'type', 'academicSession', 'class', 'section', 'startDate', 'endDate', 'status'];
+
+const pickExamFields = (data = {}) => {
+    const clean = {};
+    EXAM_FIELDS.forEach((field) => {
+        if (data[field] !== undefined) clean[field] = data[field];
+    });
+    return clean;
+};
+
 exports.createExam = async (examData, userId) => {
-    examData.createdBy = userId;
-    const exam = new Exam(examData);
+    const exam = new Exam({ ...pickExamFields(examData), createdBy: userId });
     await exam.save();
     return exam;
 };
@@ -25,7 +36,7 @@ exports.getExams = async (query = {}) => {
     }
 
     if (query.search) {
-        const safeSearch = query.search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const safeSearch = String(query.search).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         filter.name = { $regex: safeSearch, $options: 'i' };
     }
 
@@ -54,13 +65,20 @@ exports.updateExam = async (id, updateData) => {
     const exam = await Exam.findById(id);
     if (!exam) throw new AppError('Exam not found', 404);
 
-    // Protected fields
-    delete updateData._id;
-    delete updateData.createdBy;
-    delete updateData.createdAt;
-
-    Object.assign(exam, updateData);
+    const wasPublished = exam.status === 'PUBLISHED';
+    // Only whitelisted fields can be changed (protects _id, createdBy, timestamps)
+    Object.assign(exam, pickExamFields(updateData));
     await exam.save();
+
+    if (!wasPublished && exam.status === 'PUBLISHED') {
+        const recipients = await userIdsForClass(exam.class, exam.section || null);
+        await notifyUsers(recipients, {
+            type: 'RESULT',
+            title: `Results published: ${exam.name}`,
+            message: `Results for ${exam.name} (${exam.academicSession}) are now available.`,
+            link: '/student/results',
+        });
+    }
     return exam;
 };
 
@@ -68,7 +86,11 @@ exports.deleteExam = async (id) => {
     const exam = await Exam.findById(id);
     if (!exam) throw new AppError('Exam not found', 404);
 
-    // TODO Future: Verify if results exist before permitting delete
+    // Deleting an exam with recorded marks would orphan those results
+    const resultCount = await Result.countDocuments({ exam: exam._id });
+    if (resultCount > 0) {
+        throw new AppError(`Cannot delete this exam because ${resultCount} result(s) have been recorded for it`, 409);
+    }
 
     await exam.deleteOne();
     return { message: 'Exam deleted successfully' };

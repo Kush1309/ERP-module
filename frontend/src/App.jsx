@@ -50,6 +50,23 @@ import LeavePage from './pages/LeavePage';
 import LibraryPage from './pages/LibraryPage';
 import FeePage from './pages/FeePage';
 import TransportPage from './pages/TransportPage';
+import ParentManagementPage from './pages/admin/ParentManagementPage';
+import TeacherStudentsPage from './pages/teacher/TeacherStudentsPage';
+import StudentProfilePage from './pages/student/StudentProfilePage';
+import StudentExamsPage from './pages/student/StudentExamsPage';
+import NotificationsPage from './pages/modules/NotificationsPage';
+import EventsPage from './pages/modules/EventsPage';
+import ExamAnalyticsPage from './pages/modules/ExamAnalyticsPage';
+import ReportCardPage from './pages/modules/ReportCardPage';
+import FeeReceiptPage from './pages/modules/FeeReceiptPage';
+import AcademicSetupPage from './pages/admin/AcademicSetupPage';
+import SettingsPage from './pages/admin/SettingsPage';
+import StaffAccountsPage from './pages/admin/StaffAccountsPage';
+import StaffAttendancePage, { MyAttendancePage } from './pages/admin/StaffAttendancePage';
+import AdmissionsPage from './pages/admin/AdmissionsPage';
+import HostelPage from './pages/admin/HostelPage';
+import InventoryPage from './pages/admin/InventoryPage';
+import ReportsPage from './pages/admin/ReportsPage';
 import { ROLES } from './constants/roles';
 
 function App() {
@@ -227,6 +244,43 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
               <NoticeManagementPage />
+            </ProtectedRoute>
+          }
+        />
+
+
+        <Route
+          path="/admin/parents"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+              <ParentManagementPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/teacher/students"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.TEACHER]}>
+              <TeacherStudentsPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/student/profile"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.STUDENT]}>
+              <StudentProfilePage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/student/exams"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.STUDENT]}>
+              <StudentExamsPage />
             </ProtectedRoute>
           }
         />
@@ -448,6 +502,128 @@ function App() {
           element={
             <ProtectedRoute>
               <TransportPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Configuration, HR, admissions, facilities, reporting and shared modules */}
+        <Route
+          path="/admin/academic"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+              <AcademicSetupPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/settings"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+              <SettingsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/staff"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+              <StaffAccountsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/staff-attendance"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+              <StaffAttendancePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/admissions"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+              <AdmissionsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/hostel"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+              <HostelPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/inventory"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+              <InventoryPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/reports"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+              <ReportsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/examinations/:id/analytics"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+              <ExamAnalyticsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/teacher/examinations/:id/analytics"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.TEACHER]}>
+              <ExamAnalyticsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/report-card/:examId/:studentId"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.TEACHER, ROLES.STUDENT, ROLES.PARENT]}>
+              <ReportCardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/fees/records/:recordId/receipts/:receiptNumber"
+          element={
+            <ProtectedRoute>
+              <FeeReceiptPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/my-attendance"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.TEACHER, ROLES.ACCOUNTANT, ROLES.LIBRARIAN]}>
+              <MyAttendancePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/events"
+          element={
+            <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.TEACHER, ROLES.STUDENT, ROLES.PARENT, ROLES.ACCOUNTANT, ROLES.LIBRARIAN]}>
+              <EventsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/notifications"
+          element={
+            <ProtectedRoute>
+              <NotificationsPage />
             </ProtectedRoute>
           }
         />

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Button from '../../components/Button';
 import Card from '../../components/Card';
+import useClassOptions from '../../hooks/useClassOptions';
 import { getStudentById, updateStudent } from '../../services/studentApi';
 
 function EditStudentPage() {
@@ -34,6 +35,8 @@ function EditStudentPage() {
 
     const [loading, setLoading] = useState(true);
     const [initError, setInitError] = useState('');
+    const [initialClass, setInitialClass] = useState({});
+    const classOptions = useClassOptions({ keepClass: initialClass.class, keepSection: initialClass.section });
     const [errors, setErrors] = useState({});
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [apiError, setApiError] = useState('');
@@ -72,6 +75,7 @@ function EditStudentPage() {
                 };
 
                 setFormData(safeData);
+                setInitialClass({ class: safeData.class, section: safeData.section });
             } catch (err) {
                 const status = err.response?.status;
                 if (status === 404) setInitError('Student not found.');
@@ -180,7 +184,7 @@ function EditStudentPage() {
                             <label className="text-sm font-medium text-ink-700">Class *</label>
                             <select name="class" value={formData.class} onChange={handleChange} className="mt-1 block w-full rounded-md border border-ink-300 px-3 py-2 text-sm text-ink-900 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500">
                                 <option value="">Select</option>
-                                {['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'].map(c => <option key={c} value={c}>{c}</option>)}
+                                {classOptions.classes.map(c => <option key={c} value={c}>{c}</option>)}
                             </select>
                             {errors.class && <p className="mt-1 text-xs text-red-600">{errors.class}</p>}
                         </div>
@@ -189,7 +193,7 @@ function EditStudentPage() {
                             <label className="text-sm font-medium text-ink-700">Section *</label>
                             <select name="section" value={formData.section} onChange={handleChange} className="mt-1 block w-full rounded-md border border-ink-300 px-3 py-2 text-sm text-ink-900 outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500">
                                 <option value="">Select</option>
-                                {['A', 'B', 'C', 'D', 'E', 'F'].map(s => <option key={s} value={s}>{s}</option>)}
+                                {classOptions.sectionsFor(formData.class).map(s => <option key={s.value} value={s.value} disabled={s.full && s.value !== formData.section}>{s.label}</option>)}
                             </select>
                             {errors.section && <p className="mt-1 text-xs text-red-600">{errors.section}</p>}
                         </div>

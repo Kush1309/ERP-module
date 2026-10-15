@@ -1,6 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { getConversations, getConversationById, sendMessage, markMessageRead } from '../../services/messageApi';
+import Button from '../../components/Button';
+import Modal from '../../components/Modal';
+import { getConversations, getConversationById, sendMessage, markMessageRead, getContacts, createConversation } from '../../services/messageApi';
+
+const ROLE_LABELS = { ADMIN: 'Administrator', TEACHER: 'Teacher', STUDENT: 'Student', PARENT: 'Parent' };
 
 export default function InboxPage() {
     const { user } = useAuth();
@@ -13,6 +17,33 @@ export default function InboxPage() {
     const [newMessage, setNewMessage] = useState('');
     const [sending, setSending] = useState(false);
     const messagesEndRef = useRef(null);
+    const myId = user?.id ? String(user.id) : '';
+
+    // New conversation picker
+    const [composeOpen, setComposeOpen] = useState(false);
+    const [contacts, setContacts] = useState([]);
+    const [contactSearch, setContactSearch] = useState('');
+    const [loadingContacts, setLoadingContacts] = useState(false);
+    const [contactsError, setContactsError] = useState('');
+    const [startingWith, setStartingWith] = useState(null);
+
+    useEffect(() => {
+        if (!composeOpen) return undefined;
+        let cancelled = false;
+        const timer = setTimeout(async () => {
+            setLoadingContacts(true);
+            setContactsError('');
+            try {
+                const data = await getContacts(contactSearch.trim());
+                if (!cancelled) setContacts(data);
+            } catch (err) {
+                if (!cancelled) setContactsError(err.response?.data?.message || 'Unable to load contacts');
+            } finally {
+                if (!cancelled) setLoadingContacts(false);
+            }
+        }, 250);
+        return () => { cancelled = true; clearTimeout(timer); };
+    }, [composeOpen, contactSearch]);
 
     const fetchConversations = async () => {
         try {
@@ -40,16 +71,13 @@ export default function InboxPage() {
             setMessages(convoData.messages || []);
 
             // Mark unread messages as read
-            const unreadCount = convoData.messages?.filter(m =>
-                m.sender !== user._id && !m.readBy?.includes(user._id)
-            ).length;
-
-            if (unreadCount > 0) {
-                // Just mark the latest message read to satisfy read-receipt idempotent condition without spamming logic
-                const lastUnread = convoData.messages.findLast(m => m.sender !== user._id && !m.readBy?.includes(user._id));
-                if (lastUnread) {
-                    await markMessageRead(lastUnread._id).catch(() => { }); // gracefully ignore fail
-                }
+            // Mark every unread incoming message as read
+            const unread = (convoData.messages || []).filter((m) =>
+                String(m.sender) !== myId && !(m.readBy || []).map(String).includes(myId)
+            );
+            if (unread.length > 0) {
+                await Promise.all(unread.map((m) => markMessageRead(m._id).catch(() => null)));
+                fetchConversations();
             }
         } catch (err) {
             setError(err.response?.data?.message || 'Failed to open conversation');
@@ -86,18 +114,44 @@ export default function InboxPage() {
         }
     };
 
+    const getOthers = (participants) => (participants || []).filter((p) => String(p._id) !== myId);
+
     const getRecipientName = (participants) => {
-        const other = participants?.find(p => p._id !== user?._id);
-        return other ? `${other.firstName} ${other.lastName}` : 'Unknown';
+        const others = getOthers(participants);
+        return others.length ? others.map((p) => p.name || p.loginId || 'Unknown').join(', ') : 'Unknown';
+    };
+
+    const getRecipientDetail = (participants) => {
+        const others = getOthers(participants);
+        return others.length === 1 ? (others[0].detail || ROLE_LABELS[others[0].role] || '') : '';
+    };
+
+    const startConversation = async (contact) => {
+        setStartingWith(contact._id);
+        setContactsError('');
+        try {
+            const res = await createConversation([contact._id]);
+            const conversation = res.data || res;
+            setComposeOpen(false);
+            setContactSearch('');
+            await fetchConversations();
+            await loadConversation(conversation._id);
+        } catch (err) {
+            setContactsError(err.response?.data?.message || 'Unable to start conversation');
+        } finally {
+            setStartingWith(null);
+        }
     };
 
     return (
-        <div className="max-w-6xl mx-auto px-4 py-8">
-            <div className="flex justify-between items-center mb-6">
+        <div className="mx-auto w-full max-w-6xl">
+            <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                 <div>
-                    <h1 className="text-2xl font-semibold text-ink-900">Messages</h1>
-                    <p className="text-ink-500 mt-1">Communicate securely with school members.</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-600">Communication</p>
+                    <h1 className="mt-2 font-display text-3xl font-semibold text-ink-900">Messages</h1>
+                    <p className="mt-2 text-sm text-ink-600">Communicate with teachers, students, parents and the school office.</p>
                 </div>
+                <Button type="button" onClick={() => setComposeOpen(true)} className="whitespace-nowrap">+ New Message</Button>
             </div>
 
             {error && (
@@ -117,10 +171,13 @@ export default function InboxPage() {
                         {loadingConversations ? (
                             <div className="p-4 text-center text-ink-500 text-sm">Loading conversations...</div>
                         ) : conversations.length === 0 ? (
-                            <div className="p-8 text-center text-ink-500 text-sm">No messages yet.</div>
+                            <div className="p-8 text-center text-ink-500 text-sm">
+                                No conversations yet.
+                                <button type="button" onClick={() => setComposeOpen(true)} className="mt-2 block w-full font-medium text-brand-700 hover:text-brand-800">Start a new message</button>
+                            </div>
                         ) : (
                             conversations.map((convo) => {
-                                const unread = convo.lastMessage?.sender !== user?._id && !convo.lastMessage?.readBy?.includes(user?._id) && convo.lastMessage;
+                                const unread = Boolean(convo.lastMessage) && String(convo.lastMessage.sender) !== myId && !(convo.lastMessage.readBy || []).map(String).includes(myId);
                                 return (
                                     <button
                                         key={convo._id}
@@ -168,8 +225,11 @@ export default function InboxPage() {
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                                     </svg>
                                 </button>
-                                <div className="font-medium text-ink-900">
-                                    {getRecipientName(activeConversation.participants)}
+                                <div>
+                                    <div className="font-medium text-ink-900">{getRecipientName(activeConversation.participants)}</div>
+                                    {getRecipientDetail(activeConversation.participants) && (
+                                        <div className="text-xs text-ink-500">{getRecipientDetail(activeConversation.participants)}</div>
+                                    )}
                                 </div>
                             </div>
 
@@ -181,11 +241,11 @@ export default function InboxPage() {
                                     <div className="text-center text-ink-400 text-sm py-8">No messages yet. Say hello!</div>
                                 ) : (
                                     messages.map((msg) => {
-                                        const isOwn = msg.sender === user._id;
+                                        const isOwn = String(msg.sender) === myId;
                                         return (
                                             <div key={msg._id} className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
                                                 <div className={`max-w-[75%] rounded-2xl px-4 py-2 ${isOwn ? 'bg-brand-600 text-white rounded-tr-sm' : 'bg-white border border-ink-200 text-ink-900 rounded-tl-sm shadow-sm'}`}>
-                                                    <p className="text-sm whitespace-pre-wrap word-break">{msg.content}</p>
+                                                    <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
                                                     <p className={`text-[10px] mt-1 text-right ${isOwn ? 'text-brand-200' : 'text-ink-400'}`}>
                                                         {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                     </p>
@@ -222,6 +282,44 @@ export default function InboxPage() {
                     )}
                 </div>
             </div>
+
+            <Modal isOpen={composeOpen} onClose={() => { if (!startingWith) setComposeOpen(false); }} title="New Message">
+                <div className="space-y-3">
+                    <input
+                        type="text"
+                        autoFocus
+                        value={contactSearch}
+                        onChange={(e) => setContactSearch(e.target.value)}
+                        placeholder="Search people by name or login ID..."
+                        className="w-full rounded-md border border-ink-300 px-3 py-2 text-sm text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                    />
+                    {contactsError && <div className="rounded border border-red-200 bg-red-50 p-2 text-sm text-red-600">{contactsError}</div>}
+                    <div className="max-h-72 overflow-y-auto rounded-md border border-ink-200 divide-y divide-ink-100">
+                        {loadingContacts ? (
+                            <p className="p-4 text-center text-sm text-ink-500">Loading contacts...</p>
+                        ) : contacts.length === 0 ? (
+                            <p className="p-4 text-center text-sm text-ink-500">No people available to message.</p>
+                        ) : contacts.map((contact) => (
+                            <button
+                                key={contact._id}
+                                type="button"
+                                disabled={!!startingWith}
+                                onClick={() => startConversation(contact)}
+                                className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left hover:bg-brand-50 disabled:opacity-60"
+                            >
+                                <span>
+                                    <span className="block text-sm font-medium text-ink-900">{contact.name}</span>
+                                    <span className="block text-xs text-ink-500">{contact.detail}</span>
+                                </span>
+                                <span className="text-xs font-semibold text-brand-700">{startingWith === contact._id ? 'Opening…' : 'Message'}</span>
+                            </button>
+                        ))}
+                    </div>
+                    <div className="flex justify-end">
+                        <Button type="button" variant="secondary" onClick={() => setComposeOpen(false)} disabled={!!startingWith}>Close</Button>
+                    </div>
+                </div>
+            </Modal>
         </div>
     );
 }

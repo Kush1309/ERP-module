@@ -52,7 +52,7 @@ const transportRouteSchema = new mongoose.Schema(
     }
 );
 
-transportRouteSchema.index({ name: 1 }, { unique: true });
+// name uniqueness is declared on the field itself (unique: true)
 
 const TransportRoute = mongoose.model('TransportRoute', transportRouteSchema);
 

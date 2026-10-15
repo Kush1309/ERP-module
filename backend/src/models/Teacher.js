@@ -42,6 +42,10 @@ const teacherSchema = new mongoose.Schema(
             trim: true,
             uppercase: true,
         },
+        // Names from the Departments / Designations lists (free text until those are configured)
+        department: { type: String, trim: true, default: '' },
+        designation: { type: String, trim: true, default: '' },
+        joiningDate: { type: Date, default: null },
     },
     {
         timestamps: true,

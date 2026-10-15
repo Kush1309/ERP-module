@@ -44,8 +44,8 @@ exports.getRoutes = async (query = {}) => {
         ];
     }
 
-    const pageNum = Math.max(1, parseInt(page, 10)) || 1;
-    const limitNum = parseInt(limit, 10) || 10;
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.min(Math.max(parseInt(limit, 10) || 10, 1), 100);
     const skip = (pageNum - 1) * limitNum;
 
     const routes = await TransportRoute.find(filter)
@@ -86,6 +86,13 @@ exports.updateRoute = async (id, data) => {
     if (capacity !== undefined) updateData.capacity = capacity;
     if (stops !== undefined) updateData.stops = stops;
 
+    if (capacity !== undefined) {
+        const activeCount = await TransportAllocation.countDocuments({ routeId: id, status: 'ACTIVE' });
+        if (Number(capacity) < activeCount) {
+            throw new AppError(`Capacity cannot be lower than the ${activeCount} students currently allocated`, 400);
+        }
+    }
+
     try {
         const route = await TransportRoute.findByIdAndUpdate(
             id,
@@ -117,6 +124,17 @@ exports.deleteRoute = async (id) => {
 // Transport Allocation Operations
 // ============================================
 
+// Ensures a route still has a free seat before (re)activating an allocation on it
+const assertRouteHasCapacity = async (route, excludeAllocationId = null) => {
+    if (typeof route.capacity !== 'number') return;
+    const filter = { routeId: route._id, status: 'ACTIVE' };
+    if (excludeAllocationId) filter._id = { $ne: excludeAllocationId };
+    const activeCount = await TransportAllocation.countDocuments(filter);
+    if (activeCount >= route.capacity) {
+        throw new AppError(`Route "${route.name}" is full (capacity ${route.capacity})`, 409);
+    }
+};
+
 exports.createAllocation = async (data, user) => {
     if (user.role !== ROLES.ADMIN) {
         throw new AppError('Only administrators can modify transport allocations', 403);
@@ -139,6 +157,12 @@ exports.createAllocation = async (data, user) => {
     if (!route.stops || !route.stops.includes(dropStop)) {
         throw new AppError('Invalid drop stop: Stop not found on route', 400);
     }
+
+    if (await TransportAllocation.exists({ studentId, status: 'ACTIVE' })) {
+        throw new AppError('Student already has an active transport allocation', 409);
+    }
+
+    await assertRouteHasCapacity(route);
 
     try {
         const allocation = await TransportAllocation.create({
@@ -185,8 +209,8 @@ exports.getAllocations = async (query = {}, user) => {
     }
 
     const { page = 1, limit = 10 } = query;
-    const pageNum = Math.max(1, parseInt(page, 10)) || 1;
-    const limitNum = parseInt(limit, 10) || 10;
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.min(Math.max(parseInt(limit, 10) || 10, 1), 100);
     const skip = (pageNum - 1) * limitNum;
 
     const allocations = await TransportAllocation.find(filter)
@@ -299,6 +323,15 @@ exports.updateAllocation = async (id, data, user) => {
 
     if (pickupStop !== undefined) updateData.pickupStop = pickupStop;
     if (dropStop !== undefined) updateData.dropStop = dropStop;
+
+    const finalStatus = updateData.status || existing.status;
+    const routeChanged = routeId !== undefined && String(routeId) !== String(existing.routeId);
+    const reactivated = existing.status !== 'ACTIVE' && finalStatus === 'ACTIVE';
+    if (finalStatus === 'ACTIVE' && (routeChanged || reactivated)) {
+        const capacityRoute = targetRoute || await TransportRoute.findById(targetRouteId).lean();
+        if (!capacityRoute) throw new AppError('Target route not found', 404);
+        await assertRouteHasCapacity(capacityRoute, existing._id);
+    }
 
     try {
         const allocation = await TransportAllocation.findByIdAndUpdate(

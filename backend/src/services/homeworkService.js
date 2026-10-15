@@ -5,6 +5,17 @@ const Teacher = require('../models/Teacher');
 const Student = require('../models/Student');
 const ParentProfile = require('../models/ParentProfile');
 const AppError = require('../utils/AppError');
+const { notifyUsers, userIdsForClass } = require('./notificationService');
+
+const announceHomework = async (homework) => {
+    const recipients = await userIdsForClass(homework.class, homework.section);
+    await notifyUsers(recipients, {
+        type: 'HOMEWORK',
+        title: `New homework: ${homework.title}`,
+        message: `${homework.subject}${homework.dueDate ? ` · due ${new Date(homework.dueDate).toISOString().slice(0, 10)}` : ''}`,
+        link: '/homework',
+    });
+};
 
 const { isValidObjectId } = mongoose;
 
@@ -62,6 +73,7 @@ const createHomework = async (userId, data) => {
     }
 
     const homework = await Homework.create(payload);
+    if (homework.status === 'PUBLISHED') await announceHomework(homework);
     return homework;
 };
 
@@ -225,6 +237,8 @@ const updateHomework = async (userId, homeworkId, data) => {
         { new: true, runValidators: true }
     ).populate('teacherId', 'firstName lastName').lean();
 
+    if (existing.status !== 'PUBLISHED' && updated.status === 'PUBLISHED') await announceHomework(updated);
+
     return updated;
 };
 
@@ -248,6 +262,8 @@ const deleteHomework = async (userId, homeworkId) => {
     }
 
     await Homework.findByIdAndDelete(homeworkId);
+    // Remove student submissions that belonged to the deleted homework
+    await require('../models/HomeworkSubmission').deleteMany({ homework: homeworkId });
     return { success: true, message: 'Homework deleted safely' };
 };
 
