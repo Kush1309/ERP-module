@@ -468,7 +468,7 @@ function App() {
         <Route
           path="/homework"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.TEACHER, ROLES.STUDENT, ROLES.PARENT]}>
               <HomeworkPage />
             </ProtectedRoute>
           }
@@ -476,7 +476,7 @@ function App() {
         <Route
           path="/leaves"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.TEACHER, ROLES.STUDENT, ROLES.PARENT]}>
               <LeavePage />
             </ProtectedRoute>
           }
@@ -484,7 +484,7 @@ function App() {
         <Route
           path="/library"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.LIBRARIAN, ROLES.TEACHER, ROLES.STUDENT, ROLES.PARENT]}>
               <LibraryPage />
             </ProtectedRoute>
           }
@@ -492,7 +492,7 @@ function App() {
         <Route
           path="/fees"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.ACCOUNTANT, ROLES.TEACHER, ROLES.STUDENT, ROLES.PARENT]}>
               <FeePage />
             </ProtectedRoute>
           }
@@ -500,7 +500,7 @@ function App() {
         <Route
           path="/transport"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={[ROLES.ADMIN, ROLES.TEACHER, ROLES.STUDENT, ROLES.PARENT]}>
               <TransportPage />
             </ProtectedRoute>
           }

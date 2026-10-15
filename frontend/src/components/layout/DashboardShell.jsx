@@ -46,23 +46,23 @@ export default function DashboardShell({
             {/* Mobile sidebar backdrop */}
             {sidebarOpen && (
                 <div
-                    className="fixed inset-0 z-40 bg-slate-900/50 lg:hidden"
+                    className="fixed inset-0 z-40 bg-night-900/50 lg:hidden"
                     onClick={() => setSidebarOpen(false)}
                 />
             )}
 
             {/* Sidebar */}
             <aside
-                className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-slate-900 text-white transition-transform duration-300 ease-in-out lg:static lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+                className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-night-900 text-[#ffffff] transition-transform duration-300 ease-in-out lg:static lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'
                     }`}
             >
-                <div className="flex h-16 shrink-0 items-center gap-3 px-6 bg-slate-950">
+                <div className="flex h-16 shrink-0 items-center gap-3 px-6 bg-night-950">
                     <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-500 font-bold text-white shadow-sm">
                         SE
                     </div>
                     <div className="flex flex-col">
                         <span className="text-lg font-bold leading-tight">School ERP</span>
-                        <span className="text-[10px] font-medium uppercase tracking-wider text-slate-400">Campus Operations</span>
+                        <span className="text-[10px] font-medium uppercase tracking-wider text-night-400">Campus Operations</span>
                     </div>
                 </div>
 
@@ -76,13 +76,13 @@ export default function DashboardShell({
                                     to={item.href}
                                     className={`group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${isActive
                                         ? 'bg-brand-600 text-white'
-                                        : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                                        : 'text-night-300 hover:bg-night-800 hover:text-[#ffffff]'
                                         }`}
                                     aria-current={isActive ? 'page' : undefined}
                                     onClick={() => setSidebarOpen(false)}
                                 >
                                     <svg
-                                        className={`h-5 w-5 shrink-0 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-white'}`}
+                                        className={`h-5 w-5 shrink-0 ${isActive ? 'text-white' : 'text-night-400 group-hover:text-[#ffffff]'}`}
                                         fill="none"
                                         viewBox="0 0 24 24"
                                         stroke="currentColor"

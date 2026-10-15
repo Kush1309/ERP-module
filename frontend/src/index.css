@@ -4,61 +4,61 @@
 
 @layer base {
   :root {
-    --color-white: #ffffff;
-    --color-black: #000000;
+    --color-white: 255 255 255;
+    --color-black: 0 0 0;
     
     /* Brand Colors (remain mostly consistent, maybe slight tweaks) */
-    --color-brand-50: #eef6f4;
-    --color-brand-100: #d5eae4;
-    --color-brand-200: #abd4c9;
-    --color-brand-300: #79b8a8;
-    --color-brand-400: #4f9987;
-    --color-brand-500: #2f7a69;
-    --color-brand-600: #246155;
-    --color-brand-700: #1e4d44;
-    --color-brand-800: #1a3f39;
-    --color-brand-900: #163530;
+    --color-brand-50: 238 246 244;
+    --color-brand-100: 213 234 228;
+    --color-brand-200: 171 212 201;
+    --color-brand-300: 121 184 168;
+    --color-brand-400: 79 153 135;
+    --color-brand-500: 47 122 105;
+    --color-brand-600: 36 97 85;
+    --color-brand-700: 30 77 68;
+    --color-brand-800: 26 63 57;
+    --color-brand-900: 22 53 48;
 
     /* Ink Colors (Light Mode) */
-    --color-ink-50: #f6f7f8;
-    --color-ink-100: #eceef0;
-    --color-ink-200: #d5dae0;
-    --color-ink-300: #b0b9c4;
-    --color-ink-400: #8593a3;
-    --color-ink-500: #667788;
-    --color-ink-600: #516070;
-    --color-ink-700: #434e5b;
-    --color-ink-800: #3a434d;
-    --color-ink-900: #1f262e;
+    --color-ink-50: 246 247 248;
+    --color-ink-100: 236 238 240;
+    --color-ink-200: 213 218 224;
+    --color-ink-300: 176 185 196;
+    --color-ink-400: 133 147 163;
+    --color-ink-500: 102 119 136;
+    --color-ink-600: 81 96 112;
+    --color-ink-700: 67 78 91;
+    --color-ink-800: 58 67 77;
+    --color-ink-900: 31 38 46;
   }
 
   .dark {
-    --color-white: #1f2937; /* Tailwind gray-800 */
-    --color-black: #ffffff;
+    --color-white: 31 41 55; /* Tailwind gray-800 */
+    --color-black: 255 255 255;
     
     /* Brand Colors */
-    --color-brand-50: #163530;
-    --color-brand-100: #1a3f39;
-    --color-brand-200: #1e4d44;
-    --color-brand-300: #246155;
-    --color-brand-400: #2f7a69;
-    --color-brand-500: #4f9987;
-    --color-brand-600: #79b8a8;
-    --color-brand-700: #abd4c9;
-    --color-brand-800: #d5eae4;
-    --color-brand-900: #eef6f4;
+    --color-brand-50: 22 53 48;
+    --color-brand-100: 26 63 57;
+    --color-brand-200: 30 77 68;
+    --color-brand-300: 36 97 85;
+    --color-brand-400: 47 122 105;
+    --color-brand-500: 79 153 135;
+    --color-brand-600: 121 184 168;
+    --color-brand-700: 171 212 201;
+    --color-brand-800: 213 234 228;
+    --color-brand-900: 238 246 244;
 
     /* Ink Colors (Inverted for Dark Mode) */
-    --color-ink-50: #111827; /* Tailwind gray-900, page background */
-    --color-ink-100: #1f2937; /* Tailwind gray-800 */
-    --color-ink-200: #374151; /* Tailwind gray-700 */
-    --color-ink-300: #4b5563; /* Tailwind gray-600 */
-    --color-ink-400: #6b7280; /* Tailwind gray-500 */
-    --color-ink-500: #9ca3af; /* Tailwind gray-400 */
-    --color-ink-600: #d1d5db; /* Tailwind gray-300 */
-    --color-ink-700: #e5e7eb; /* Tailwind gray-200 */
-    --color-ink-800: #f3f4f6; /* Tailwind gray-100 */
-    --color-ink-900: #f9fafb; /* Tailwind gray-50 */
+    --color-ink-50: 17 24 39; /* Tailwind gray-900, page background */
+    --color-ink-100: 31 41 55; /* Tailwind gray-800 */
+    --color-ink-200: 55 65 81; /* Tailwind gray-700 */
+    --color-ink-300: 75 85 99; /* Tailwind gray-600 */
+    --color-ink-400: 107 114 128; /* Tailwind gray-500 */
+    --color-ink-500: 156 163 175; /* Tailwind gray-400 */
+    --color-ink-600: 209 213 219; /* Tailwind gray-300 */
+    --color-ink-700: 229 231 235; /* Tailwind gray-200 */
+    --color-ink-800: 243 244 246; /* Tailwind gray-100 */
+    --color-ink-900: 249 250 251; /* Tailwind gray-50 */
   }
 }
 
@@ -74,6 +74,18 @@
 
   #root {
     @apply min-h-screen;
+  }
+
+  /* Form controls without their own bg-* class follow the theme instead of the browser's white */
+  input,
+  select,
+  textarea {
+    @apply bg-white;
+  }
+
+  /* Native widgets (date pickers, dropdown lists, scrollbars) render dark in dark mode */
+  .dark {
+    color-scheme: dark;
   }
 }
 

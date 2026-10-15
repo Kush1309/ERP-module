@@ -488,7 +488,7 @@ function StudentManagementPage() {
       </Card>
 
       {showConfirmModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-900/50">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-night-950/50">
           <Card className="w-full max-w-sm p-6 shadow-xl relative z-10 pointer-events-auto">
             <h3 className="mb-4 text-lg font-semibold text-ink-900">Confirm Bulk Action</h3>
             <p className="mb-6 text-sm text-ink-600">
@@ -507,7 +507,7 @@ function StudentManagementPage() {
       )}
 
       {showImportModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink-900/50">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-night-950/50">
           <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 shadow-xl relative z-10 pointer-events-auto">
             <h3 className="mb-4 text-lg font-semibold text-ink-900">Import Students</h3>
             <p className="mb-4 text-sm text-ink-600">
